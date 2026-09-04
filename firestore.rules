@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isOwner() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
+    }
+
+    // ---- users ----
+    match /users/{uid} {
+      allow read: if isSelf(uid) || isOwner();
+      allow create: if isSelf(uid) && request.resource.data.role == 'client';
+      // Ninguém troca o próprio papel (role) direto pelo cliente — isso só acontece
+      // via Cloud Function "claimOwnerRole", que usa o Admin SDK (ignora estas regras).
+      allow update: if isSelf(uid) &&
+        request.resource.data.role == resource.data.role;
+    }
+
+    // ---- catálogo público (leitura por qualquer usuário logado) ----
+    match /services/{serviceId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner();
+    }
+
+    match /plans/{planId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner();
+    }
+
+    match /businessSettings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isOwner();
+    }
+
+    // ---- agendamentos ----
+    // Criação/edição de status por callable (Admin SDK) para clientes;
+    // o dono também pode atualizar status diretamente pela agenda.
+    match /appointments/{appointmentId} {
+      allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid);
+      allow update: if isOwner();
+      allow create, delete: if false;
+    }
+
+    // ---- assinaturas (planos assinados) ----
+    // Só Cloud Functions (Admin SDK) criam/alteram — cobrança e cancelamento
+    // exigem chamar a API do Mercado Pago, então passam sempre por callable.
+    match /subscriptions/{subscriptionId} {
+      allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid);
+      allow write: if false;
+    }
+
+    // ---- pagamentos (histórico, gerado pelo webhook) ----
+    match /payments/{paymentId} {
+      allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid);
+      allow write: if false;
+    }
+
+    // ---- notificações ----
+    match /notifications/{notificationId} {
+      allow read: if isOwner() || (isSignedIn() && resource.data.targetUserId == request.auth.uid);
+      // Cliente/dono só pode marcar como lida (read: true), nada mais.
+      allow update: if (isOwner() || (isSignedIn() && resource.data.targetUserId == request.auth.uid))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create, delete: if false;
+    }
+  }
+}

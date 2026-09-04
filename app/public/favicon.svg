@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f3d27a"/>
+      <stop offset="50%" stop-color="#c9a227"/>
+      <stop offset="100%" stop-color="#8a6c17"/>
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="#0b0b0c" stroke="url(#gold)" stroke-width="2.5"/>
+  <g fill="none" stroke="url(#gold)" stroke-width="4" stroke-linecap="round">
+    <line x1="30" y1="26" x2="70" y2="74"/>
+    <line x1="70" y1="26" x2="30" y2="74"/>
+    <circle cx="27" cy="24" r="7" fill="#0b0b0c"/>
+    <circle cx="73" cy="24" r="7" fill="#0b0b0c"/>
+    <circle cx="27" cy="76" r="7" fill="#0b0b0c"/>
+    <circle cx="73" cy="76" r="7" fill="#0b0b0c"/>
+  </g>
+  <text x="50" y="94" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="9" fill="url(#gold)" letter-spacing="1">PRIMER</text>
+</svg>
