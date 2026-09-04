@@ -6,8 +6,10 @@ export const MP_ACCESS_TOKEN = defineSecret('MP_ACCESS_TOKEN')
 /** Chave secreta do webhook, gerada em Suas integrações > Webhooks, no painel do Mercado Pago. */
 export const MP_WEBHOOK_SECRET = defineSecret('MP_WEBHOOK_SECRET')
 
-/** URL pública do PWA publicado (ex: https://barbearia-primer.web.app), sem barra no final. */
-export const APP_BASE_URL = defineString('APP_BASE_URL')
+/** URL pública do PWA publicado, sem barra no final. */
+export const APP_BASE_URL = defineString('APP_BASE_URL', {
+  default: 'https://barbearia-primer.web.app',
+})
 
 /**
  * Código secreto que promove um cadastro a "proprietário". Fica só no servidor
