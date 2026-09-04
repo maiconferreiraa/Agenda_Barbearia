@@ -36,23 +36,25 @@ export function ClientLayout() {
         <Outlet />
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-2xl justify-around border-t border-ink-border bg-ink-soft/95 backdrop-blur">
-        {NAV.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              clsx(
-                'flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px]',
-                isActive ? 'text-gold-light' : 'text-neutral-500',
-              )
-            }
-          >
-            <span className="text-lg">{item.icon}</span>
-            {item.label}
-          </NavLink>
-        ))}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-border bg-ink-soft/95 backdrop-blur">
+        <div className="mx-auto flex max-w-2xl justify-around">
+          {NAV.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              className={({ isActive }) =>
+                clsx(
+                  'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px]',
+                  isActive ? 'text-gold-light' : 'text-neutral-500',
+                )
+              }
+            >
+              <span className="text-lg">{item.icon}</span>
+              <span className="w-full truncate text-center">{item.label}</span>
+            </NavLink>
+          ))}
+        </div>
       </nav>
     </div>
   )

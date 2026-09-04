@@ -78,13 +78,13 @@ export function OwnerLayout() {
               end={item.end}
               className={({ isActive }) =>
                 clsx(
-                  'flex flex-1 flex-col items-center gap-0.5 py-2 text-[10px]',
+                  'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[10px]',
                   isActive ? 'text-gold-light' : 'text-neutral-500',
                 )
               }
             >
               <span className="text-base">{item.icon}</span>
-              {item.label}
+              <span className="w-full truncate text-center">{item.label}</span>
             </NavLink>
           ))}
         </nav>
