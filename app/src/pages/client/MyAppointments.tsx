@@ -3,7 +3,7 @@ import { Spinner } from '../../components/ui/Spinner'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useAuth } from '../../contexts/AuthContext'
 import { useClientAppointments } from '../../hooks/useAppointments'
-import { formatCurrency, formatDateTime } from '../../lib/format'
+import { appointmentPaymentLabel, formatDateTime } from '../../lib/format'
 
 export function MyAppointments() {
   const { profile } = useAuth()
@@ -27,9 +27,7 @@ export function MyAppointments() {
             <div>
               <p className="text-sm font-medium text-neutral-100">{a.serviceName}</p>
               <p className="text-xs text-neutral-500">{formatDateTime(a.date)}</p>
-              <p className="text-xs text-neutral-600">
-                {a.usedPlanCredit ? 'Crédito do plano' : formatCurrency(a.price)}
-              </p>
+              <p className="text-xs text-neutral-600">{appointmentPaymentLabel(a)}</p>
             </div>
             <StatusBadge status={a.status} />
           </Card>

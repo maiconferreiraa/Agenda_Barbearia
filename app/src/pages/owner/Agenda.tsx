@@ -6,7 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
 import { useAppointmentsRange } from '../../hooks/useAppointments'
-import { formatCurrency, formatTime } from '../../lib/format'
+import { appointmentPaymentLabel, formatTime } from '../../lib/format'
 import type { AppointmentStatus } from '../../types'
 
 function startOfDay(d: Date) {
@@ -82,8 +82,7 @@ export function Agenda() {
               <div>
                 <p className="text-sm font-medium text-neutral-100">{a.clientName}</p>
                 <p className="text-xs text-neutral-400">
-                  {a.serviceName} · {a.durationMinutes} min ·{' '}
-                  {a.usedPlanCredit ? 'crédito do plano' : formatCurrency(a.price)}
+                  {a.serviceName} · {a.durationMinutes} min · {appointmentPaymentLabel(a)}
                 </p>
                 {a.clientPhone && <p className="text-xs text-neutral-600">{a.clientPhone}</p>}
               </div>

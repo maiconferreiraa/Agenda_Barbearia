@@ -8,18 +8,24 @@ export const getAvailableSlots = onCall({ region: REGION }, async (request) => {
   const uid = request.auth?.uid
   if (!uid) throw new HttpsError('unauthenticated', 'Você precisa estar logado.')
 
-  const serviceId = request.data?.serviceId as string | undefined
+  const serviceIds = request.data?.serviceIds as string[] | undefined
   const dateISO = request.data?.dateISO as string | undefined
-  if (!serviceId || !dateISO) {
-    throw new HttpsError('invalid-argument', 'serviceId e dateISO são obrigatórios.')
+  if (!serviceIds?.length || !dateISO) {
+    throw new HttpsError('invalid-argument', 'serviceIds e dateISO são obrigatórios.')
   }
+  const uniqueServiceIds = Array.from(new Set(serviceIds))
 
-  const [serviceSnap, settingsSnap] = await Promise.all([
-    db.collection('services').doc(serviceId).get(),
+  const [serviceSnaps, settingsSnap] = await Promise.all([
+    Promise.all(uniqueServiceIds.map((id) => db.collection('services').doc(id).get())),
     db.collection('businessSettings').doc('main').get(),
   ])
-  if (!serviceSnap.exists) throw new HttpsError('not-found', 'Serviço não encontrado.')
-  const service = serviceSnap.data()!
+  if (serviceSnaps.some((s) => !s.exists)) {
+    throw new HttpsError('not-found', 'Serviço não encontrado.')
+  }
+  const totalDuration = serviceSnaps.reduce(
+    (sum, s) => sum + (s.data()!.durationMinutes as number),
+    0,
+  )
   const settings = settingsSnap.data() as BusinessHours | undefined
   if (!settings) return { slots: [] }
 
@@ -28,7 +34,7 @@ export const getAvailableSlots = onCall({ region: REGION }, async (request) => {
   const dayEnd = new Date(day)
   dayEnd.setHours(23, 59, 59, 999)
 
-  const candidates = dayStartSlots(day, service.durationMinutes, settings)
+  const candidates = dayStartSlots(day, totalDuration, settings)
   if (candidates.length === 0) return { slots: [] }
 
   const busySnap = await db
@@ -48,7 +54,7 @@ export const getAvailableSlots = onCall({ region: REGION }, async (request) => {
 
   const free = candidates.filter((slot) => {
     const startMin = slot.getHours() * 60 + slot.getMinutes()
-    const endMin = startMin + service.durationMinutes
+    const endMin = startMin + totalDuration
     return !busyRanges.some((b) => startMin < b.end && endMin > b.start)
   })
 

@@ -7,27 +7,33 @@ export const bookAppointment = onCall({ region: REGION }, async (request) => {
   const uid = request.auth?.uid
   if (!uid) throw new HttpsError('unauthenticated', 'Você precisa estar logado.')
 
-  const serviceId = request.data?.serviceId as string | undefined
+  const serviceIds = request.data?.serviceIds as string[] | undefined
   const dateISO = request.data?.dateISO as string | undefined
-  if (!serviceId || !dateISO) {
-    throw new HttpsError('invalid-argument', 'serviceId e dateISO são obrigatórios.')
+  if (!serviceIds?.length || !dateISO) {
+    throw new HttpsError('invalid-argument', 'serviceIds e dateISO são obrigatórios.')
   }
+  const uniqueServiceIds = Array.from(new Set(serviceIds))
 
   const date = new Date(dateISO)
   if (Number.isNaN(date.getTime()) || date.getTime() < Date.now() - 60_000) {
     throw new HttpsError('invalid-argument', 'Horário inválido.')
   }
 
-  const [userSnap, serviceSnap] = await Promise.all([
+  const [userSnap, serviceSnaps] = await Promise.all([
     db.collection('users').doc(uid).get(),
-    db.collection('services').doc(serviceId).get(),
+    Promise.all(uniqueServiceIds.map((id) => db.collection('services').doc(id).get())),
   ])
   if (!userSnap.exists) throw new HttpsError('not-found', 'Usuário não encontrado.')
   const user = userSnap.data()!
-  if (!serviceSnap.exists || serviceSnap.data()?.active !== true) {
-    throw new HttpsError('not-found', 'Serviço indisponível.')
-  }
-  const service = serviceSnap.data()!
+
+  const services = serviceSnaps.map((snap, i) => {
+    if (!snap.exists || snap.data()?.active !== true) {
+      throw new HttpsError('not-found', 'Serviço indisponível.')
+    }
+    const data = snap.data() as { name: string; durationMinutes: number; price: number }
+    return { id: uniqueServiceIds[i], ...data }
+  })
+  const totalDuration = services.reduce((sum, s) => sum + s.durationMinutes, 0)
 
   const dayStart = new Date(date)
   dayStart.setHours(0, 0, 0, 0)
@@ -50,7 +56,7 @@ export const bookAppointment = onCall({ region: REGION }, async (request) => {
         .where('date', '<=', Timestamp.fromDate(dayEnd)),
     )
     const startMin = date.getHours() * 60 + date.getMinutes()
-    const endMin = startMin + service.durationMinutes
+    const endMin = startMin + totalDuration
     const overlaps = daySnap.docs
       .map((d) => d.data())
       .filter((a) => a.status !== 'canceled')
@@ -64,34 +70,56 @@ export const bookAppointment = onCall({ region: REGION }, async (request) => {
     }
 
     const subSnap = await tx.get(activeSubQuery)
-    let usedPlanCredit = false
     let subscriptionId: string | undefined
+    let subDocRef: FirebaseFirestore.DocumentReference | undefined
+    let planIncluded: { serviceId: string; quantity: number }[] = []
+    let usage: Record<string, number> = {}
 
     if (!subSnap.empty) {
       const subDoc = subSnap.docs[0]
       const sub = subDoc.data()
+      subscriptionId = subDoc.id
+      subDocRef = subDoc.ref
       const planSnap = await tx.get(db.collection('plans').doc(sub.planId))
-      const included = (planSnap.data()?.includedServices ?? []) as {
+      planIncluded = (planSnap.data()?.includedServices ?? []) as {
         serviceId: string
         quantity: number
       }[]
-      const rule = included.find((i) => i.serviceId === serviceId)
-      const used = (sub.usage?.[serviceId] as number | undefined) ?? 0
-      if (rule && used < rule.quantity) {
-        usedPlanCredit = true
-        subscriptionId = subDoc.id
-        tx.update(subDoc.ref, { [`usage.${serviceId}`]: used + 1 })
-      }
+      usage = sub.usage ?? {}
     }
+
+    const usageUpdates: Record<string, number> = {}
+    const lines = services.map((s) => {
+      const rule = planIncluded.find((i) => i.serviceId === s.id)
+      const used = usage[s.id] ?? 0
+      const usedPlanCredit = !!rule && used < rule.quantity
+      if (usedPlanCredit) {
+        usageUpdates[`usage.${s.id}`] = used + 1
+      }
+      return {
+        serviceId: s.id,
+        serviceName: s.name,
+        durationMinutes: s.durationMinutes,
+        price: s.price,
+        usedPlanCredit,
+      }
+    })
+
+    if (subDocRef && Object.keys(usageUpdates).length > 0) {
+      tx.update(subDocRef, usageUpdates)
+    }
+
+    const totalPrice = lines.filter((l) => !l.usedPlanCredit).reduce((sum, l) => sum + l.price, 0)
+    const usedPlanCredit = lines.some((l) => l.usedPlanCredit)
 
     tx.set(appointmentRef, {
       clientId: uid,
       clientName: user.name,
       clientPhone: user.phone ?? null,
-      serviceId,
-      serviceName: service.name,
-      durationMinutes: service.durationMinutes,
-      price: service.price,
+      services: lines,
+      serviceName: lines.map((l) => l.serviceName).join(' + '),
+      durationMinutes: totalDuration,
+      price: totalPrice,
       subscriptionId: subscriptionId ?? null,
       usedPlanCredit,
       date: Timestamp.fromDate(date),

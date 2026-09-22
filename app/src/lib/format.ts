@@ -1,7 +1,15 @@
 import type { Timestamp } from 'firebase/firestore'
+import type { Appointment } from '../types'
 
 export function formatCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+/** Rótulo de cobrança de um agendamento — parte pode vir de crédito do plano e parte paga. */
+export function appointmentPaymentLabel(a: Pick<Appointment, 'usedPlanCredit' | 'price'>) {
+  if (!a.usedPlanCredit) return formatCurrency(a.price)
+  if (a.price === 0) return 'crédito do plano'
+  return `${formatCurrency(a.price)} + crédito do plano`
 }
 
 export function formatDate(value?: Timestamp | Date | null) {

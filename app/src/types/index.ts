@@ -69,12 +69,20 @@ export type AppointmentStatus =
   | 'canceled'
   | 'no_show'
 
+export interface AppointmentServiceLine {
+  serviceId: string
+  serviceName: string
+  durationMinutes: number
+  price: number
+  usedPlanCredit: boolean
+}
+
 export interface Appointment {
   id: string
   clientId: string
   clientName: string
   clientPhone?: string
-  serviceId: string
+  services: AppointmentServiceLine[]
   serviceName: string
   durationMinutes: number
   price: number
