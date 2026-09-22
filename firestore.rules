@@ -19,7 +19,14 @@ service cloud.firestore {
     // ---- users ----
     match /users/{uid} {
       allow read: if isSelf(uid) || isOwner();
-      allow create: if isSelf(uid) && request.resource.data.role == 'client';
+      // TEMP (dev local, sem Cloud Functions/Blaze): permite criar direto como
+      // 'owner' só para o e-mail de teste abaixo. Reverter para
+      // `request.resource.data.role == 'client'` antes de liberar cadastro
+      // público / produção — ver CLAUDE.md do projeto.
+      allow create: if isSelf(uid) &&
+        (request.resource.data.role == 'client' ||
+          (request.resource.data.role == 'owner' &&
+            request.auth.token.email == 'dono@barbearia.teste'));
       // Ninguém troca o próprio papel (role) direto pelo cliente — isso só acontece
       // via Cloud Function "claimOwnerRole", que usa o Admin SDK (ignora estas regras).
       allow update: if isSelf(uid) &&

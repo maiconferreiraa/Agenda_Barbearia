@@ -14,14 +14,8 @@ import {
   type User,
 } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
-import { httpsCallable } from 'firebase/functions'
-import { auth, db, functions } from '../firebase'
+import { auth, db } from '../firebase'
 import type { UserProfile } from '../types'
-
-const claimOwnerRoleFn = httpsCallable<{ inviteCode: string }, { ok: true }>(
-  functions,
-  'claimOwnerRole',
-)
 
 interface AuthContextValue {
   user: User | null
@@ -81,24 +75,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       input.password,
     )
     await updateProfile(cred.user, { displayName: input.name })
+    // TEMP (dev local, sem Cloud Functions/Blaze): sem a função `claimOwnerRole`
+    // implantada, o papel 'owner' é decidido aqui no cliente e só é aceito pela
+    // regra do Firestore para o e-mail de teste 'dono@barbearia.teste'
+    // (ver firestore.rules). Reverter para chamar claimOwnerRoleFn antes de
+    // liberar cadastro público / produção — ver CLAUDE.md do projeto.
     const newProfile: UserProfile = {
       uid: cred.user.uid,
       name: input.name,
       email: input.email,
       phone: input.phone,
-      role: 'client',
+      role: input.inviteCode?.trim() ? 'owner' : 'client',
     }
     await setDoc(doc(db, 'users', cred.user.uid), {
       ...newProfile,
       createdAt: serverTimestamp(),
     })
-
-    if (input.inviteCode?.trim()) {
-      // Validado no servidor: o código nunca fica exposto no bundle do app.
-      await claimOwnerRoleFn({ inviteCode: input.inviteCode.trim() }).catch(() => {
-        throw new Error('Código do proprietário inválido.')
-      })
-    }
   }
 
   async function login(email: string, password: string) {
