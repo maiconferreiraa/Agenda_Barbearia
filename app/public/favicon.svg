@@ -15,5 +15,5 @@
     <circle cx="27" cy="76" r="7" fill="#0b0b0c"/>
     <circle cx="73" cy="76" r="7" fill="#0b0b0c"/>
   </g>
-  <text x="50" y="94" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="9" fill="url(#gold)" letter-spacing="1">PRIMER</text>
+  <text x="50" y="94" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="9" fill="url(#gold)" letter-spacing="1">PRIME</text>
 </svg>

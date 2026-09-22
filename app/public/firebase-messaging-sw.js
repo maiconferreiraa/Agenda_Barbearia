@@ -18,7 +18,7 @@ firebase.initializeApp({
 const messaging = firebase.messaging()
 
 messaging.onBackgroundMessage((payload) => {
-  const title = payload.notification?.title ?? 'Barbearia Primer'
+  const title = payload.notification?.title ?? 'Barbearia Prime'
   const body = payload.notification?.body ?? ''
   self.registration.showNotification(title, {
     body,

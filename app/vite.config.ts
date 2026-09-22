@@ -11,9 +11,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
-        name: 'Barbearia Primer',
-        short_name: 'Primer',
-        description: 'Agenda, planos e assinaturas da Barbearia Primer',
+        name: 'Barbearia Prime',
+        short_name: 'Prime',
+        description: 'Agenda, planos e assinaturas da Barbearia Prime',
         theme_color: '#0b0b0c',
         background_color: '#0b0b0c',
         display: 'standalone',

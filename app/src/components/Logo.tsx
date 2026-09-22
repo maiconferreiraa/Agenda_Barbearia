@@ -5,7 +5,7 @@ export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
     <div className="flex items-center gap-2.5">
       <img
         src="/favicon.svg"
-        alt="Barbearia Primer"
+        alt="Barbearia Prime"
         className={clsx(
           size === 'sm' && 'h-7 w-7',
           size === 'md' && 'h-9 w-9',
@@ -21,7 +21,7 @@ export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
             size === 'lg' && 'text-2xl',
           )}
         >
-          Barbearia Primer
+          Barbearia Prime
         </p>
         {size !== 'sm' && (
           <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">

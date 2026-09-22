@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { enablePushNotifications } from '../lib/push'
 
-const DISMISS_KEY = 'primer:push-dismissed'
+const DISMISS_KEY = 'prime:push-dismissed'
 
 export function EnablePush() {
   const { user } = useAuth()

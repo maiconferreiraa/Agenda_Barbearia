@@ -8,7 +8,7 @@ export const MP_WEBHOOK_SECRET = defineSecret('MP_WEBHOOK_SECRET')
 
 /** URL pública do PWA publicado, sem barra no final. */
 export const APP_BASE_URL = defineString('APP_BASE_URL', {
-  default: 'https://barbearia-primer.web.app',
+  default: 'https://barbearia-prime-app.web.app',
 })
 
 /**

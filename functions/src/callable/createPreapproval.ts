@@ -58,7 +58,7 @@ export const createPreapproval = onCall(
     try {
       const preapproval = await preApprovalApi().create({
         body: {
-          reason: `${plan.name} - Barbearia Primer`,
+          reason: `${plan.name} - Barbearia Prime`,
           external_reference: subRef.id,
           payer_email: user.email,
           back_url: `${baseUrl}/app/subscription`,

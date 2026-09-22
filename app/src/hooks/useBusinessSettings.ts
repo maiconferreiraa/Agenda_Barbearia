@@ -5,7 +5,7 @@ import { DEFAULT_BUSINESS_HOURS } from '../lib/schedule'
 import type { BusinessSettings } from '../types'
 
 export const DEFAULT_SETTINGS: BusinessSettings = {
-  name: 'Barbearia Primer',
+  name: 'Barbearia Prime',
   phone: '',
   address: '',
   slotDurationMinutes: 30,

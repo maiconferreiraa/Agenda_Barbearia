@@ -1,6 +1,6 @@
-# Barbearia Primer
+# Barbearia Prime
 
-Sistema completo de agenda, planos mensais e cobrança recorrente para a Barbearia Primer.
+Sistema completo de agenda, planos mensais e cobrança recorrente para a Barbearia Prime.
 
 - **PWA** (React + Vite + TypeScript + Tailwind): funciona no computador, notebook e celular, instalável como app, tudo sincronizado em tempo real (Firestore).
 - **Backend** (Firebase: Auth, Firestore, Cloud Functions, Hosting, Cloud Messaging).
@@ -10,7 +10,7 @@ Sistema completo de agenda, planos mensais e cobrança recorrente para a Barbear
 ## Estrutura
 
 ```
-barbearia_primer/
+barbearia_prime/
   app/          → o PWA (React)
   functions/    → Cloud Functions (integração com Mercado Pago, webhooks, notificações, agenda)
   firestore.rules
@@ -27,7 +27,7 @@ barbearia_primer/
 
 ## 2. Criar o projeto Firebase
 
-1. No [Console Firebase](https://console.firebase.google.com), crie um projeto novo (ex: `barbearia-primer`).
+1. No [Console Firebase](https://console.firebase.google.com), crie um projeto novo (ex: `barbearia-prime`).
 2. **Plano Blaze** (pay-as-you-go): necessário para Cloud Functions. Tem uma cota gratuita generosa — para uma barbearia normal, o custo tende a ficar próximo de R$ 0.
 3. Ative:
    - **Authentication** → método "E-mail/senha".
@@ -35,7 +35,7 @@ barbearia_primer/
    - **Cloud Messaging** → em "Certificados Web Push", gere um par de chaves (isso é a `VAPID key`).
    - **Hosting**.
 4. Em "Configurações do projeto → Seus apps", crie um app Web e copie as credenciais (`apiKey`, `authDomain`, etc).
-5. Rode `firebase use --add` dentro de `barbearia_primer/` e selecione esse projeto (isso atualiza o `.firebaserc`).
+5. Rode `firebase use --add` dentro de `barbearia_prime/` e selecione esse projeto (isso atualiza o `.firebaserc`).
 
 ## 3. Configurar o app (frontend)
 
@@ -76,7 +76,7 @@ APP_BASE_URL=https://SEU-PROJETO.web.app
 ## 5. Build e deploy
 
 ```bash
-# na raiz de barbearia_primer/
+# na raiz de barbearia_prime/
 cd app && npm run build && cd ..
 firebase deploy
 ```

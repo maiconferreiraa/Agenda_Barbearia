@@ -35,7 +35,7 @@ export async function enablePushNotifications(uid: string): Promise<'granted' | 
   }
 
   onMessage(messaging, (payload) => {
-    const title = payload.notification?.title ?? 'Barbearia Primer'
+    const title = payload.notification?.title ?? 'Barbearia Prime'
     const body = payload.notification?.body ?? ''
     if (Notification.permission === 'granted') {
       new Notification(title, { body, icon: '/icons/icon-192.png' })
