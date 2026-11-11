@@ -76,12 +76,13 @@ service cloud.firestore {
     }
 
     // ---- WhatsApp da barbearia: QR para conectar e status (só o dono) ----
-    // A ponte (conta de serviço) publica o QR; o dono pode pedir para desconectar.
+    // A ponte (conta de serviço) publica o QR/código; o dono pode pedir o código
+    // de pareamento (conectar só pelo celular) ou desconectar.
     match /private/{docId} {
       allow read: if isOwner();
       allow update: if isOwner()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['command'])
-        && request.resource.data.command == 'logout';
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['command', 'pairPhone'])
+        && request.resource.data.command in ['logout', 'pair'];
     }
 
     // ---- fila de WhatsApp (só o servidor e a ponte local, com a conta de serviço) ----

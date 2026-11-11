@@ -25,7 +25,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { initializeApp, cert } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
-import { conectar, desconectar, enviarTexto, estaConectado, estaDeslogado, quandoMudar } from './whatsapp.mjs'
+import { conectar, desconectar, enviarTexto, estaConectado, estaDeslogado, pedirCodigo, quandoMudar } from './whatsapp.mjs'
 
 const PASTA = path.join(os.homedir(), '.config', 'barbearia-prime')
 const CONFIG_PATH = path.join(PASTA, 'ponte.json')
@@ -159,6 +159,8 @@ function publicarEstado(estado) {
         status: estado.status,
         qr: estado.qr ?? null,
         phone: estado.phone ?? null,
+        // conectou: o código de pareamento não vale mais
+        ...(estado.status === 'connected' ? { pairingCode: null, pairingError: null } : {}),
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
@@ -168,10 +170,30 @@ function publicarEstado(estado) {
 
 function ouvirComandos() {
   estadoRef().onSnapshot(async (snap) => {
-    if (snap.data()?.command !== 'logout') return
-    log('pedido de desconectar vindo do app')
-    await estadoRef().update({ command: FieldValue.delete() }).catch(() => {})
-    await desconectar()
+    const data = snap.data() ?? {}
+    if (data.command === 'logout') {
+      log('pedido de desconectar vindo do app')
+      await estadoRef().update({ command: FieldValue.delete() }).catch(() => {})
+      await desconectar()
+      return
+    }
+    if (data.command === 'pair') {
+      let numero = String(data.pairPhone ?? '').replace(/\D/g, '').replace(/^0+/, '')
+      if (numero.length === 10 || numero.length === 11) numero = `55${numero}`
+      await estadoRef().update({ command: FieldValue.delete(), pairPhone: FieldValue.delete() }).catch(() => {})
+      if (!/^55\d{10,11}$/.test(numero)) {
+        await estadoRef().update({ pairingCode: null, pairingError: 'Número inválido. Use DDD + número.' })
+        return
+      }
+      try {
+        const code = await pedirCodigo(numero)
+        log('código de pareamento gerado para', numero.slice(0, 6) + '…')
+        await estadoRef().update({ pairingCode: code, pairingError: null, pairingAt: FieldValue.serverTimestamp() })
+      } catch (err) {
+        log('erro ao gerar código:', err.message)
+        await estadoRef().update({ pairingCode: null, pairingError: err.message })
+      }
+    }
   })
 }
 

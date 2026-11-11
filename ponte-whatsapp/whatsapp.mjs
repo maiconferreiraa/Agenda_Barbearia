@@ -123,3 +123,15 @@ export async function desconectar() {
     sock.end?.(undefined)
   }
 }
+
+/**
+ * Conectar sem QR (dono só com o celular): gera o código de 8 letras para
+ * WhatsApp → Aparelhos conectados → Conectar um aparelho → "Conectar com
+ * número de telefone". `numero` no formato 55DDDNÚMERO.
+ */
+export async function pedirCodigo(numero) {
+  if (estaConectado()) throw new Error('O WhatsApp já está conectado.')
+  if (!sock) throw new Error('Conexão ainda iniciando, tente de novo em instantes.')
+  const code = await sock.requestPairingCode(numero)
+  return code.length === 8 ? `${code.slice(0, 4)}-${code.slice(4)}` : code
+}

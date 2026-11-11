@@ -4,11 +4,16 @@ import QRCode from 'qrcode'
 import { db } from '../firebase'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
+import { Input } from './ui/Field'
+import { useBusinessSettings } from '../hooks/useBusinessSettings'
 
 interface WhatsAppState {
   status?: 'qr' | 'connected' | 'disconnected'
   qr?: string | null
   phone?: string | null
+  /** Código de 8 letras para conectar sem QR (só pelo celular). */
+  pairingCode?: string | null
+  pairingError?: string | null
   updatedAt?: Timestamp
 }
 
@@ -32,6 +37,29 @@ export function WhatsAppCard() {
   const [state, setState] = useState<WhatsAppState | null>(null)
   const [qrImage, setQrImage] = useState('')
   const [busy, setBusy] = useState(false)
+  // No celular não dá pra escanear a própria tela: começa pelo código.
+  const [mode, setMode] = useState<'code' | 'qr'>(() => (window.innerWidth < 768 ? 'code' : 'qr'))
+  const { settings } = useBusinessSettings()
+  const [pairPhone, setPairPhone] = useState('')
+  const [requesting, setRequesting] = useState(false)
+
+  useEffect(() => {
+    if (!pairPhone && settings.phone) setPairPhone(settings.phone)
+  }, [settings.phone, pairPhone])
+
+  // Chegou o código (ou erro): para de esperar.
+  useEffect(() => {
+    if (state?.pairingCode || state?.pairingError) setRequesting(false)
+  }, [state?.pairingCode, state?.pairingError])
+
+  async function handleRequestCode() {
+    setRequesting(true)
+    try {
+      await updateDoc(doc(db, 'private', 'whatsapp'), { command: 'pair', pairPhone })
+    } catch {
+      setRequesting(false)
+    }
+  }
 
   useEffect(
     () =>
@@ -84,19 +112,84 @@ export function WhatsAppCard() {
         </div>
       )}
 
-      {state?.status === 'qr' && qrImage && !qrStale && (
+      {state?.status === 'qr' && !qrStale && (
         <div className="space-y-3">
-          <ol className="list-decimal space-y-1 pl-5 text-sm text-neutral-300">
-            <li>No celular da barbearia, abra o <b>WhatsApp</b>.</li>
-            <li>
-              Toque em <b>⋮ (ou Configurações) → Aparelhos conectados → Conectar um aparelho</b>.
-            </li>
-            <li>Aponte a câmera para o código abaixo.</li>
-          </ol>
-          <div className="flex justify-center rounded-md bg-white p-3">
-            <img src={qrImage} alt="QR Code para conectar o WhatsApp" className="h-56 w-56" />
+          <div className="flex rounded-md border border-ink-border p-0.5 text-sm">
+            <button
+              type="button"
+              onClick={() => setMode('code')}
+              className={`flex-1 rounded px-2 py-1.5 ${mode === 'code' ? 'bg-gold text-ink' : 'text-neutral-400'}`}
+            >
+              Só pelo celular
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('qr')}
+              className={`flex-1 rounded px-2 py-1.5 ${mode === 'qr' ? 'bg-gold text-ink' : 'text-neutral-400'}`}
+            >
+              Pelo computador (QR)
+            </button>
           </div>
-          <p className="text-center text-xs text-neutral-500">O código muda sozinho a cada poucos segundos.</p>
+
+          {mode === 'code' && (
+            <div className="space-y-3">
+              {!state.pairingCode ? (
+                <>
+                  <Input
+                    label="Número do WhatsApp da barbearia"
+                    inputMode="tel"
+                    placeholder="(31) 99999-9999"
+                    value={pairPhone}
+                    onChange={(e) => setPairPhone(e.target.value)}
+                  />
+                  {state.pairingError && <p className="text-sm text-red-400">{state.pairingError}</p>}
+                  <Button className="w-full" loading={requesting} onClick={handleRequestCode}>
+                    Gerar código
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <p className="text-center text-xs text-neutral-400">Seu código:</p>
+                  <p className="text-center font-mono text-3xl tracking-[0.2em] text-gold-light">{state.pairingCode}</p>
+                  <ol className="list-decimal space-y-1 pl-5 text-sm text-neutral-300">
+                    <li>Abra o <b>WhatsApp</b> desse número.</li>
+                    <li>
+                      Toque em <b>⋮ (ou Configurações) → Aparelhos conectados → Conectar um aparelho</b>.
+                    </li>
+                    <li>
+                      Toque em <b>"Conectar com número de telefone"</b> e digite o código acima.
+                    </li>
+                  </ol>
+                  <p className="text-xs text-neutral-500">
+                    Quando o WhatsApp pedir, deixe esta tela aberta ou volte pra ela — aparece "✓ Conectado" sozinho.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleRequestCode}
+                    className="text-xs text-neutral-500 underline underline-offset-2"
+                  >
+                    Gerar outro código
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          {mode === 'qr' && qrImage && (
+            <div className="space-y-3">
+              <ol className="list-decimal space-y-1 pl-5 text-sm text-neutral-300">
+                <li>No celular da barbearia, abra o <b>WhatsApp</b>.</li>
+                <li>
+                  Toque em <b>⋮ (ou Configurações) → Aparelhos conectados → Conectar um aparelho</b>.
+                </li>
+                <li>Aponte a câmera para o código abaixo.</li>
+              </ol>
+              <div className="flex justify-center rounded-md bg-white p-3">
+                <img src={qrImage} alt="QR Code para conectar o WhatsApp" className="h-56 w-56" />
+              </div>
+              <p className="text-center text-xs text-neutral-500">O código muda sozinho a cada poucos segundos.</p>
+            </div>
+          )}
         </div>
       )}
 
