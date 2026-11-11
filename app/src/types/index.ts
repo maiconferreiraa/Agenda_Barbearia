@@ -57,6 +57,8 @@ export interface Subscription {
   usage: Record<string, number>
   /** Mensalidade em aberto (link InfinitePay), se houver. */
   openInvoice?: OpenInvoice | null
+  /** Cliente cancelou pelo app: vale até currentPeriodEnd e depois encerra. */
+  cancelAtPeriodEnd?: boolean
   /** Quando os créditos do próximo mês já pago começam. */
   creditsResetAt?: Timestamp
   currentPeriodStart?: Timestamp
@@ -101,6 +103,7 @@ export interface Appointment {
   usedPlanCredit?: boolean
   date: Timestamp
   status: AppointmentStatus
+  canceledBy?: 'client' | 'owner'
   notes?: string
   createdAt?: Timestamp
 }

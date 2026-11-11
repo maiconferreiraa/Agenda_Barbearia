@@ -61,7 +61,9 @@ export function Subscriptions() {
                 <div className="text-right">
                   <StatusBadge status={s.status} />
                   <p className={`mt-1 text-xs ${HEALTH_TEXT[health.level]}`}>
-                    {s.openInvoice?.overdue
+                    {s.cancelAtPeriodEnd
+                      ? `Cancelado pelo cliente — vale até ${formatDate(s.currentPeriodEnd)}`
+                      : s.openInvoice?.overdue
                       ? `Em atraso desde ${formatDate(s.openInvoice.dueDate)}`
                       : s.currentPeriodEnd
                         ? `Vence em ${formatDate(s.currentPeriodEnd)}`

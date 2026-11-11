@@ -79,6 +79,22 @@ async function processSubscription(doc: QueryDocumentSnapshot) {
     })
   }
 
+  // 1b) Cliente cancelou pelo app: vale até o fim do mês pago, sem novas cobranças.
+  if (sub.cancelAtPeriodEnd) {
+    if (sub.status === 'active' && periodEnd.getTime() <= now.getTime()) {
+      await doc.ref.update({ status: 'canceled', canceledAt: FieldValue.serverTimestamp(), canceledBy: 'client' })
+      await notify({
+        type: 'plan_canceled',
+        targetUserId: sub.clientId,
+        relatedId: doc.id,
+        link: SUBSCRIPTION_PAGE,
+        title: 'Plano encerrado',
+        message: `Seu plano "${sub.planName}" foi encerrado, como você pediu. Obrigado por ter sido assinante!`,
+      })
+    }
+    return
+  }
+
   // 2) Sem cobrança em aberto e vencimento chegando → gera a próxima mensalidade.
   if (!sub.openInvoice) {
     if (periodEnd.getTime() - now.getTime() <= INVOICE_LEAD_DAYS * DAY_MS) {

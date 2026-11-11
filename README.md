@@ -127,6 +127,9 @@ no cartão por API. Por isso a mensalidade é um link novo por mês:
 - A InfiniteTag é do dono da barbearia: ele cola em **Configurações → Pagamentos** (aceita `$tag`, `@tag` ou o link da loja). O botão "Conectar" (`connectInfinitePay`) cria um link de teste de R$ 1,00 pra confirmar que a InfinitePay aceita, e só então salva em `businessSettings/pagamento`.
 - Os mesmos avisos (com o link de pagamento) também vão por **WhatsApp**, por um número próprio da barbearia, via `ponte-whatsapp/` (veja o README de lá).
 - O proprietário pode cancelar em **Assinaturas → Cancelar** (`cancelSubscription`): para de gerar mensalidades e cancela a que estiver em aberto.
+- O **cliente** também cancela o próprio plano em **Assinatura → Cancelar plano** (`cancelMyPlan`): se estiver em dia, continua valendo até o fim do mês pago e não recebe mais cobranças (até lá pode tocar "Quero manter meu plano"); se estiver aguardando pagamento ou em atraso, cancela na hora.
+- O cliente **desmarca horário** em **Horários → Desmarcar** até 2 h antes (`cancelMyAppointment`; prazo em `functions/src/lib/cancelRules.ts`). Com menos de 2 h, só falando com a barbearia.
+- Horário cancelado — pelo cliente ou pelo dono na agenda — **devolve o crédito do plano** automaticamente (`onAppointmentCanceled`), se for do mês atual.
 - Agendamentos **sem** plano ativo (ou sem crédito restante no mês) são marcados como "pagamento no balcão".
 
 ## Limitações conhecidas / próximos passos sugeridos

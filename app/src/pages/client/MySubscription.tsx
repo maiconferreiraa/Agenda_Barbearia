@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { useClientSubscriptions } from '../../hooks/useSubscriptions'
 import { usePlans } from '../../hooks/usePlans'
 import { formatCurrency, formatDate } from '../../lib/format'
-import { confirmInvoicePaymentFn } from '../../lib/paymentsApi'
+import { cancelMyPlanFn, confirmInvoicePaymentFn } from '../../lib/paymentsApi'
 
 type ReturnState = 'checking' | 'paid' | 'not_paid' | null
 
@@ -39,6 +39,44 @@ export function MySubscription() {
     subscriptions.find((s) => s.status === 'expired' && s.openInvoice) ??
     subscriptions[0]
   const invoice = current?.openInvoice
+  const [planBusy, setPlanBusy] = useState(false)
+  const [planError, setPlanError] = useState('')
+
+  async function handleCancelPlan() {
+    if (!current) return
+    const msg =
+      current.status === 'active'
+        ? `Cancelar o plano "${current.planName}"? Você continua usando até ${formatDate(current.currentPeriodEnd)} e não haverá novas cobranças.`
+        : `Cancelar o plano "${current.planName}"? A mensalidade em aberto será cancelada.`
+    if (!confirm(msg)) return
+    setPlanBusy(true)
+    setPlanError('')
+    try {
+      await cancelMyPlanFn({ subscriptionId: current.id })
+    } catch (err) {
+      setPlanError((err as Error).message || 'Não foi possível cancelar.')
+    } finally {
+      setPlanBusy(false)
+    }
+  }
+
+  async function handleKeepPlan() {
+    if (!current) return
+    setPlanBusy(true)
+    setPlanError('')
+    try {
+      await cancelMyPlanFn({ subscriptionId: current.id, undo: true })
+    } catch (err) {
+      setPlanError((err as Error).message || 'Não foi possível manter o plano.')
+    } finally {
+      setPlanBusy(false)
+    }
+  }
+
+  const canCancelPlan =
+    !!current &&
+    ['active', 'pending', 'past_due'].includes(current.status) &&
+    !current.cancelAtPeriodEnd
   const currentPlan = plans.find((p) => p.id === current?.planId)
 
   return (
@@ -141,6 +179,30 @@ export function MySubscription() {
               Esta assinatura foi cancelada e não haverá novas cobranças.
             </p>
           )}
+
+          {current.status === 'active' && current.cancelAtPeriodEnd && (
+            <div className="mt-4 space-y-2 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+              <p className="text-sm text-amber-300">
+                Você cancelou este plano. Ele vale até{' '}
+                <b>{formatDate(current.currentPeriodEnd)}</b> e não haverá novas cobranças.
+              </p>
+              <Button variant="secondary" loading={planBusy} onClick={handleKeepPlan} className="!px-3 !py-1.5 text-xs">
+                Quero manter meu plano
+              </Button>
+            </div>
+          )}
+
+          {canCancelPlan && (
+            <button
+              type="button"
+              disabled={planBusy}
+              onClick={handleCancelPlan}
+              className="mt-4 text-xs text-neutral-500 underline underline-offset-2 hover:text-red-300 disabled:opacity-50"
+            >
+              {planBusy ? 'Cancelando…' : 'Cancelar plano'}
+            </button>
+          )}
+          {planError && <p className="mt-2 text-sm text-red-400">{planError}</p>}
         </Card>
       )}
     </div>
