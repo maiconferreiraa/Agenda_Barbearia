@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { doc, updateDoc } from 'firebase/firestore'
-import { db } from '../../firebase'
+import { setAppointmentStatusFn } from '../../lib/bookingApi'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -42,7 +41,11 @@ export function Agenda() {
   const { data: appointments, loading } = useAppointmentsRange(day, endOfDay(day))
 
   async function changeStatus(id: string, status: AppointmentStatus) {
-    await updateDoc(doc(db, 'appointments', id), { status })
+    try {
+      await setAppointmentStatusFn({ appointmentId: id, status })
+    } catch (err) {
+      alert((err as Error).message)
+    }
   }
 
   return (

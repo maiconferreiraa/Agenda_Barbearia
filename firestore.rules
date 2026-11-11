@@ -19,16 +19,10 @@ service cloud.firestore {
     // ---- users ----
     match /users/{uid} {
       allow read: if isSelf(uid) || isOwner();
-      // TEMP (dev local, sem Cloud Functions/Blaze): permite criar direto como
-      // 'owner' só para o e-mail de teste abaixo. Reverter para
-      // `request.resource.data.role == 'client'` antes de liberar cadastro
-      // público / produção — ver CLAUDE.md do projeto.
-      allow create: if isSelf(uid) &&
-        (request.resource.data.role == 'client' ||
-          (request.resource.data.role == 'owner' &&
-            request.auth.token.email == 'dono@barbearia.teste'));
-      // Ninguém troca o próprio papel (role) direto pelo cliente — isso só acontece
-      // via Cloud Function "claimOwnerRole", que usa o Admin SDK (ignora estas regras).
+      // Todo cadastro nasce como cliente. Virar "owner" só pelo servidor
+      // (/api/claimOwnerRole, com o código do proprietário), que ignora estas regras.
+      allow create: if isSelf(uid) && request.resource.data.role == 'client';
+      // Ninguém troca o próprio papel (role) direto pelo app.
       allow update: if isSelf(uid) &&
         request.resource.data.role == resource.data.role;
     }
@@ -50,17 +44,16 @@ service cloud.firestore {
     }
 
     // ---- agendamentos ----
-    // Criação/edição de status por callable (Admin SDK) para clientes;
-    // o dono também pode atualizar status diretamente pela agenda.
+    // Criar, desmarcar e mudar status só pelo servidor (/api/*), que também
+    // desconta e devolve os créditos do plano.
     match /appointments/{appointmentId} {
       allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid);
-      allow update: if isOwner();
+      allow update: if false;
       allow create, delete: if false;
     }
 
     // ---- assinaturas (planos assinados) ----
-    // Só Cloud Functions (Admin SDK) criam/alteram — cobrança e cancelamento
-    // passam pela InfinitePay, então sempre via callable/webhook.
+    // Só o servidor (/api/*, webhook e régua diária) cria/altera.
     match /subscriptions/{subscriptionId} {
       allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid);
       allow write: if false;
@@ -72,7 +65,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ---- fila de WhatsApp (só Cloud Functions e a ponte local, via Admin SDK) ----
+    // ---- fila de WhatsApp (só o servidor e a ponte local, com a conta de serviço) ----
     match /whatsappOutbox/{messageId} {
       allow read, write: if false;
     }

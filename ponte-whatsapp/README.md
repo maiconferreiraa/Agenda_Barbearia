@@ -5,10 +5,10 @@ mensalidade: link de pagamento InfinitePay, véspera, atraso, lembretes,
 plano vencido e pagamento confirmado.
 
 ```
-Cloud Functions ──grava──▶ Firestore whatsappOutbox ──lê──▶ ponte.mjs (PC ligado) ──▶ WhatsApp da barbearia
+Servidor (Cloudflare) ──grava──▶ Firestore whatsappOutbox ──lê──▶ ponte.mjs (PC ligado) ──▶ WhatsApp da barbearia
 ```
 
-As Cloud Functions rodam no Google e não seguram uma conexão de WhatsApp,
+O servidor roda no Cloudflare e não segura uma conexão de WhatsApp,
 por isso a fila no meio. A ponte é independente de qualquer outro sistema do PC.
 
 ## Ligar (uma vez)

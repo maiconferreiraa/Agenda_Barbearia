@@ -14,6 +14,7 @@ import {
   type User,
 } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
+import { claimOwnerRoleFn } from '../lib/bookingApi'
 import { auth, db } from '../firebase'
 import type { UserProfile } from '../types'
 
@@ -75,22 +76,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       input.password,
     )
     await updateProfile(cred.user, { displayName: input.name })
-    // TEMP (dev local, sem Cloud Functions/Blaze): sem a função `claimOwnerRole`
-    // implantada, o papel 'owner' é decidido aqui no cliente e só é aceito pela
-    // regra do Firestore para o e-mail de teste 'dono@barbearia.teste'
-    // (ver firestore.rules). Reverter para chamar claimOwnerRoleFn antes de
-    // liberar cadastro público / produção — ver CLAUDE.md do projeto.
+    // Todo cadastro nasce como cliente; com o código do proprietário, o
+    // servidor (claimOwnerRole) promove a conta — o código nunca fica no app.
     const newProfile: UserProfile = {
       uid: cred.user.uid,
       name: input.name,
       email: input.email,
       phone: input.phone,
-      role: input.inviteCode?.trim() ? 'owner' : 'client',
+      role: 'client',
     }
     await setDoc(doc(db, 'users', cred.user.uid), {
       ...newProfile,
       createdAt: serverTimestamp(),
     })
+    const inviteCode = input.inviteCode?.trim()
+    if (inviteCode) {
+      try {
+        await claimOwnerRoleFn({ inviteCode })
+      } catch (err) {
+        throw new Error(
+          `Conta criada como cliente — ${(err as Error).message} Peça o código correto e fale com o suporte.`,
+        )
+      }
+    }
   }
 
   async function login(email: string, password: string) {

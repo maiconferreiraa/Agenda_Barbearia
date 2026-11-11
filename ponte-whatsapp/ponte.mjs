@@ -6,7 +6,7 @@
 /**
  * Ponte WhatsApp da Barbearia Prime.
  *
- * As Cloud Functions gravam as mensagens de cobrança em `whatsappOutbox`
+ * O servidor (Cloudflare Worker) grava as mensagens de cobrança em `whatsappOutbox`
  * (Firestore). Esta ponte roda num PC ligado, lê a fila e envia pelo WhatsApp
  * PRÓPRIO da barbearia (whatsapp.mjs — número/chip só dela), marcando cada
  * mensagem como enviada ou com falha.

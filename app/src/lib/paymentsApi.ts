@@ -1,27 +1,26 @@
-import { httpsCallable } from 'firebase/functions'
-import { functions } from '../firebase'
+import { callApi } from './api'
 
-export const subscribePlanFn = httpsCallable<
+export const subscribePlanFn = callApi<
   { planId: string },
   { checkoutUrl: string }
->(functions, 'subscribePlan')
+>('subscribePlan')
 
-export const confirmInvoicePaymentFn = httpsCallable<
+export const confirmInvoicePaymentFn = callApi<
   { orderNsu: string; transactionNsu: string; slug: string },
   { paid: boolean }
->(functions, 'confirmInvoicePayment')
+>('confirmInvoicePayment')
 
-export const cancelSubscriptionFn = httpsCallable<
+export const cancelSubscriptionFn = callApi<
   { subscriptionId: string },
   { ok: true }
->(functions, 'cancelSubscription')
+>('cancelSubscription')
 
-export const connectInfinitePayFn = httpsCallable<
+export const connectInfinitePayFn = callApi<
   { handle?: string; disconnect?: boolean },
   { handle: string | null }
->(functions, 'connectInfinitePay')
+>('connectInfinitePay')
 
-export const cancelMyPlanFn = httpsCallable<
+export const cancelMyPlanFn = callApi<
   { subscriptionId: string; undo?: boolean },
   { status: 'active' | 'canceled' }
->(functions, 'cancelMyPlan')
+>('cancelMyPlan')
