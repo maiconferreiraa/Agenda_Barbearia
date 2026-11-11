@@ -2,7 +2,14 @@ import { ApiError } from '../env'
 import type { Ctx } from './ctx'
 import { requireOwner } from './ctx'
 import { cancelOpenInvoice, createInvoice, markInvoicePaid } from '../billing'
-import { PAYMENT_SETTINGS, checkPayment, createCheckoutLink, normalizeHandle, savedHandle } from '../infinitepay'
+import {
+  InfinitePayError,
+  PAYMENT_SETTINGS,
+  checkPayment,
+  createCheckoutLink,
+  normalizeHandle,
+  savedHandle,
+} from '../infinitepay'
 import { notify } from '../notify'
 import { addMonths, formatBr } from '../time'
 
@@ -124,6 +131,12 @@ export async function connectInfinitePay(ctx: Ctx) {
     })
   } catch (err) {
     console.warn('Teste de conexão InfinitePay falhou', handle, String(err))
+    if (err instanceof InfinitePayError && err.code === 'external_checkout_not_enabled') {
+      throw new ApiError(
+        'failed-precondition',
+        'Sua conta InfinitePay ainda não libera cobrança pelo sistema. Toque em "Ativar na InfinitePay", ative o Checkout Integrado e depois toque em Conectar de novo.',
+      )
+    }
     throw new ApiError(
       'failed-precondition',
       'A InfinitePay não aceitou essa InfiniteTag. Confira no app da InfinitePay e tente de novo.',

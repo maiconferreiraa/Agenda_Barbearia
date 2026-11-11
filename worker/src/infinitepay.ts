@@ -25,6 +25,16 @@ export async function savedHandle(fs: Firestore): Promise<string | null> {
   return normalizeHandle(doc?.data.infinitePayHandle)
 }
 
+/** Erro da API com o código que a InfinitePay devolve (ex.: external_checkout_not_enabled). */
+export class InfinitePayError extends Error {
+  constructor(public path: string, public status: number, public code: string) {
+    super(`InfinitePay ${path} falhou (${status}${code ? `: ${code}` : ''})`)
+  }
+}
+
+/** Onde o dono liga o Checkout Integrado na conta InfinitePay. */
+export const ENABLE_CHECKOUT_URL = 'https://app.infinitepay.io/external-checkout#configuracoes?enabled=true'
+
 async function post(path: string, body: unknown): Promise<Record<string, unknown>> {
   const res = await gfetch(`${BASE_URL}${path}`, {
     method: 'POST',
@@ -40,7 +50,7 @@ async function post(path: string, body: unknown): Promise<Record<string, unknown
   }
   if (!res.ok) {
     console.error('InfinitePay erro', path, res.status, text.slice(0, 500))
-    throw new Error(`InfinitePay ${path} falhou (${res.status})`)
+    throw new InfinitePayError(path, res.status, typeof data.error === 'string' ? data.error : '')
   }
   return data
 }

@@ -5,6 +5,9 @@ import { Input } from './ui/Field'
 import { usePaymentSettings } from '../hooks/usePaymentSettings'
 import { connectInfinitePayFn } from '../lib/paymentsApi'
 
+/** Página da InfinitePay onde o dono libera a cobrança por sistema (Checkout Integrado). */
+const ENABLE_CHECKOUT_URL = 'https://app.infinitepay.io/external-checkout#configuracoes?enabled=true'
+
 /** Configurações → Pagamentos: o dono cola a InfiniteTag e toca "Conectar". */
 export function InfinitePayCard() {
   const { settings, loading } = usePaymentSettings()
@@ -68,6 +71,13 @@ export function InfinitePayCard() {
             required
           />
           {error && <p className="text-sm text-red-400">{error}</p>}
+          {error.includes('Ativar na InfinitePay') && (
+            <a href={ENABLE_CHECKOUT_URL} target="_blank" rel="noopener noreferrer" className="block">
+              <Button type="button" variant="secondary" className="w-full">
+                Ativar na InfinitePay ↗
+              </Button>
+            </a>
+          )}
           <Button type="submit" loading={busy} className="w-full">
             Conectar
           </Button>
