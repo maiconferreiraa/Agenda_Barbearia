@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   name: 'Barbearia Prime',
   phone: '',
   address: '',
-  slotDurationMinutes: 30,
+  slotDurationMinutes: 60,
   hours: DEFAULT_BUSINESS_HOURS,
 }
 

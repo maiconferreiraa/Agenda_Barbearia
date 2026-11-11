@@ -18,7 +18,7 @@ interface DayHours {
 
 /** Mesmo padrão do app (app/src/lib/schedule.ts) — vale enquanto o dono não salvar Configurações. */
 const DEFAULT_SETTINGS: Data = {
-  slotDurationMinutes: 30,
+  slotDurationMinutes: 60,
   hours: {
     mon: { enabled: true, open: '09:00', close: '19:00' },
     tue: { enabled: true, open: '09:00', close: '19:00' },
@@ -40,7 +40,7 @@ function candidateStarts(day: Date, duration: number, settings: Data): number[] 
   const p = sp(day)
   const hours = (settings.hours as Record<string, DayHours> | undefined)?.[WEEKDAY_KEYS[p.weekday]]
   if (!hours?.enabled) return []
-  const step = Number(settings.slotDurationMinutes) || 30
+  const step = Number(settings.slotDurationMinutes) || 60
   const open = toMinutes(hours.open)
   const close = toMinutes(hours.close)
 
