@@ -3,6 +3,7 @@ import { db } from './admin'
 import { APP_BASE_URL } from './params'
 import { createCheckoutLink } from './infinitepay'
 import { notify } from './notify'
+import { businessInfo, firstName, queueWhatsapp } from './whatsapp'
 
 /**
  * Mensalidades com InfinitePay.
@@ -213,6 +214,18 @@ export async function markInvoicePaid(
     link: SUBSCRIPTION_PAGE,
     title: 'Pagamento confirmado',
     message: `Recebemos a mensalidade do plano "${inv.planName}". Obrigado!`,
+  })
+  const [clientSnap, shop] = await Promise.all([
+    db.collection('users').doc(inv.clientId).get(),
+    businessInfo(),
+  ])
+  await queueWhatsapp({
+    phone: clientSnap.data()?.phone,
+    kind: 'payment_received',
+    relatedId: inv.subscriptionId,
+    text:
+      `Pagamento confirmado, ${firstName(inv.clientName)}! ✅\n\n` +
+      `Recebemos R$ ${valor} da mensalidade do plano *${inv.planName}*. Obrigado!\n\n${shop.name}`,
   })
   return true
 }

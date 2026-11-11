@@ -125,6 +125,7 @@ no cartão por API. Por isso a mensalidade é um link novo por mês:
   - assinatura que nunca pagou a 1ª mensalidade é descartada após 7 dias;
   - zera os créditos no dia em que começa o mês já pago.
 - Prazos ficam no topo de `functions/src/scheduled/dailyBilling.ts`.
+- Os mesmos avisos (com o link de pagamento) também vão por **WhatsApp**, pelo número do robô 8615, via `ponte-whatsapp/` (veja o README de lá).
 - O proprietário pode cancelar em **Assinaturas → Cancelar** (`cancelSubscription`): para de gerar mensalidades e cancela a que estiver em aberto.
 - Agendamentos **sem** plano ativo (ou sem crédito restante no mês) são marcados como "pagamento no balcão".
 

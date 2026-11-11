@@ -1,0 +1,15 @@
+# Copiar para ~/.config/systemd/user/ e ativar com:
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now barbearia-ponte-whatsapp
+[Unit]
+Description=Barbearia Prime - ponte WhatsApp (fila do Firestore -> robo 8615)
+After=network-online.target
+
+[Service]
+WorkingDirectory=%h/Documents/Projetos Pessoais/barbearia_prime/ponte-whatsapp
+ExecStart=/usr/bin/env node ponte.mjs
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=default.target

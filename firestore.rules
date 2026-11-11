@@ -72,6 +72,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---- fila de WhatsApp (só Cloud Functions e a ponte local, via Admin SDK) ----
+    match /whatsappOutbox/{messageId} {
+      allow read, write: if false;
+    }
+
     // ---- pagamentos (histórico, gerado pelo webhook) ----
     match /payments/{paymentId} {
       allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid);

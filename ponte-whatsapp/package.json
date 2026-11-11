@@ -1,0 +1,13 @@
+{
+  "name": "barbearia-ponte-whatsapp",
+  "private": true,
+  "type": "module",
+  "description": "Lê a fila whatsappOutbox do Firestore e envia pelo robô de WhatsApp local",
+  "scripts": {
+    "start": "node ponte.mjs",
+    "uma-vez": "node ponte.mjs --uma-vez"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0"
+  }
+}

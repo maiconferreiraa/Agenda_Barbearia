@@ -5,6 +5,11 @@ import { db } from '../lib/admin'
 import { REGION } from '../lib/region'
 import { notify } from '../lib/notify'
 import { SUBSCRIPTION_PAGE, addMonths, cancelOpenInvoice, createInvoice, formatBr } from '../lib/billing'
+import { businessInfo, clientPhone, firstName, queueWhatsapp } from '../lib/whatsapp'
+
+function brl(value: unknown) {
+  return `R$ ${Number(value).toFixed(2).replace('.', ',')}`
+}
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -77,7 +82,7 @@ async function processSubscription(doc: QueryDocumentSnapshot) {
   // 2) Sem cobrança em aberto e vencimento chegando → gera a próxima mensalidade.
   if (!sub.openInvoice) {
     if (periodEnd.getTime() - now.getTime() <= INVOICE_LEAD_DAYS * DAY_MS) {
-      await createInvoice({
+      const { checkoutUrl } = await createInvoice({
         subRef: doc.ref,
         sub: {
           clientId: sub.clientId,
@@ -98,9 +103,22 @@ async function processSubscription(doc: QueryDocumentSnapshot) {
         title: 'Sua mensalidade chegou',
         message: `A mensalidade do plano "${sub.planName}" vence em ${formatBr(periodEnd)}. Toque para pagar por Pix ou cartão.`,
       })
+      const { name: shop } = await businessInfo()
+      await queueWhatsapp({
+        phone: await clientPhone(sub.clientId),
+        kind: 'invoice_created',
+        relatedId: doc.id,
+        text:
+          `Olá, ${firstName(sub.clientName)}! 💈\n\n` +
+          `Sua mensalidade do plano *${sub.planName}* (${brl(sub.planPrice)}) vence em *${formatBr(periodEnd)}*.\n\n` +
+          `Pague por Pix ou cartão neste link:\n${checkoutUrl}\n\n${shop}`,
+      })
     }
     return
   }
+
+  const { name: shop } = await businessInfo()
+  const payLink = sub.openInvoice.checkoutUrl as string
 
   // 3) Cobrança em aberto: véspera, atraso, lembretes e vencimento do plano.
   const invoiceRef = db.collection('invoices').doc(sub.openInvoice.id)
@@ -124,6 +142,15 @@ async function processSubscription(doc: QueryDocumentSnapshot) {
         link: SUBSCRIPTION_PAGE,
         title: 'Mensalidade vence amanhã',
         message: `Sua mensalidade do plano "${sub.planName}" vence em ${formatBr(due)}. Pague para não perder os benefícios.`,
+      })
+      await queueWhatsapp({
+        phone: await clientPhone(sub.clientId),
+        kind: 'due_soon',
+        relatedId: doc.id,
+        text:
+          `Oi, ${firstName(sub.clientName)}! Lembrete: sua mensalidade do plano *${sub.planName}* ` +
+          `(${brl(invoice.amount)}) vence em *${formatBr(due)}*.\n\n` +
+          `Link para pagar:\n${payLink}\n\nSe já pagou, pode ignorar. ${shop}`,
       })
     }
     return
@@ -150,6 +177,21 @@ async function processSubscription(doc: QueryDocumentSnapshot) {
       title: 'Mensalidade em atraso',
       message: `Sua mensalidade do plano "${sub.planName}" venceu em ${formatBr(due)}. Os benefícios ficam pausados até o pagamento. Toque para pagar.`,
     })
+    await queueWhatsapp({
+      phone: await clientPhone(sub.clientId),
+      kind: 'payment_overdue',
+      relatedId: doc.id,
+      text:
+        `Olá, ${firstName(sub.clientName)}. Sua mensalidade do plano *${sub.planName}* ` +
+        `(${brl(invoice.amount)}) do dia *${formatBr(due)}* está em atraso.\n\n` +
+        `Os benefícios do plano ficam pausados até o pagamento. Regularize pelo link:\n${payLink}\n\n${shop}`,
+    })
+    await queueWhatsapp({
+      phone: (await businessInfo()).phone,
+      kind: 'payment_overdue_owner',
+      relatedId: doc.id,
+      text: `🚨 Mensalidade em atraso: ${sub.clientName} — ${sub.planName} (${brl(invoice.amount)}), vencida em ${formatBr(due)}.`,
+    })
     return
   }
 
@@ -171,6 +213,14 @@ async function processSubscription(doc: QueryDocumentSnapshot) {
       title: 'Seu plano venceu',
       message: `Seu plano "${sub.planName}" venceu por falta de pagamento. Pague a mensalidade em aberto para reativar.`,
     })
+    await queueWhatsapp({
+      phone: await clientPhone(sub.clientId),
+      kind: 'plan_expired',
+      relatedId: doc.id,
+      text:
+        `Olá, ${firstName(sub.clientName)}. Seu plano *${sub.planName}* venceu por falta de pagamento ` +
+        `(${daysLate} dias de atraso).\n\nPara reativar, é só pagar a mensalidade:\n${payLink}\n\n${shop}`,
+    })
     return
   }
 
@@ -187,6 +237,15 @@ async function processSubscription(doc: QueryDocumentSnapshot) {
       link: SUBSCRIPTION_PAGE,
       title: 'Lembrete: mensalidade em atraso',
       message: `Sua mensalidade do plano "${sub.planName}" está ${daysLate} dia(s) atrasada. Faltam ${GRACE_DAYS - daysLate} dia(s) para o plano vencer.`,
+    })
+    await queueWhatsapp({
+      phone: await clientPhone(sub.clientId),
+      kind: 'overdue_reminder',
+      relatedId: doc.id,
+      text:
+        `Oi, ${firstName(sub.clientName)}. Sua mensalidade do plano *${sub.planName}* está com ` +
+        `${daysLate} dia(s) de atraso. Faltam ${GRACE_DAYS - daysLate} dia(s) para o plano vencer.\n\n` +
+        `Link para pagar:\n${payLink}\n\n${shop}`,
     })
   }
 }
