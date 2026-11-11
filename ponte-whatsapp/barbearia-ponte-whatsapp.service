@@ -7,7 +7,7 @@ After=network-online.target
 
 [Service]
 WorkingDirectory=%h/Documents/Projetos Pessoais/barbearia_prime/ponte-whatsapp
-ExecStart=/usr/bin/env node ponte.mjs
+ExecStart=/usr/local/bin/node ponte.mjs
 Restart=always
 RestartSec=30
 
