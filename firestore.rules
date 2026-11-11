@@ -27,6 +27,11 @@ service cloud.firestore {
         request.resource.data.role == resource.data.role;
     }
 
+    // ---- usuários de login (maicon.ferreira → uid): só o servidor lê e grava ----
+    match /usernames/{username} {
+      allow read, write: if false;
+    }
+
     // ---- catálogo público (leitura por qualquer usuário logado) ----
     match /services/{serviceId} {
       allow read: if isSignedIn();

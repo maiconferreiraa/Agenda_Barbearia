@@ -1,6 +1,8 @@
 export interface Env {
   ASSETS: Fetcher
   FIREBASE_PROJECT_ID: string
+  /** Chave pública do app web do Firebase (a mesma do app), para conferir senha no login por usuário. */
+  FIREBASE_WEB_API_KEY: string
   APP_BASE_URL: string
   /** JSON da conta de serviço do Firebase (Configurações do projeto → Contas de serviço). */
   GOOGLE_SERVICE_ACCOUNT: string

@@ -9,12 +9,13 @@ import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   signOut,
   updateProfile,
   type User,
 } from 'firebase/auth'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
-import { claimOwnerRoleFn } from '../lib/bookingApi'
+import { claimOwnerRoleFn, claimUsernameFn, loginWithUsernameFn, usernameAvailableFn } from '../lib/bookingApi'
 import { auth, db } from '../firebase'
 import type { UserProfile } from '../types'
 
@@ -28,8 +29,11 @@ interface AuthContextValue {
     phone: string
     password: string
     inviteCode?: string
+    /** Usuário para entrar sem e-mail (ex.: maicon.ferreira). */
+    username?: string
   }) => Promise<void>
-  login: (email: string, password: string) => Promise<void>
+  /** Aceita e-mail ou usuário (ex.: maicon.ferreira). */
+  login: (emailOrUsername: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -69,7 +73,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     phone: string
     password: string
     inviteCode?: string
+    /** Usuário para entrar sem e-mail (ex.: maicon.ferreira). */
+    username?: string
   }) {
+    const username = input.username?.trim().toLowerCase()
+    if (username) {
+      const check = await usernameAvailableFn({ username })
+      if (!check.data.available) {
+        throw new Error(
+          check.data.reason === 'invalid'
+            ? 'Usuário inválido: use letras, números, ponto ou _ (3 a 30).'
+            : 'Esse usuário já existe. Escolha outro.',
+        )
+      }
+    }
     const cred = await createUserWithEmailAndPassword(
       auth,
       input.email,
@@ -89,6 +106,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ...newProfile,
       createdAt: serverTimestamp(),
     })
+    if (username) {
+      try {
+        await claimUsernameFn({ username })
+      } catch (err) {
+        throw new Error(`Conta criada! Mas o usuário não foi salvo (${(err as Error).message}) — entre com seu e-mail.`)
+      }
+    }
     const inviteCode = input.inviteCode?.trim()
     if (inviteCode) {
       try {
@@ -101,8 +125,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function login(email: string, password: string) {
-    await signInWithEmailAndPassword(auth, email, password)
+  async function login(emailOrUsername: string, password: string) {
+    const id = emailOrUsername.trim()
+    if (id.includes('@')) {
+      await signInWithEmailAndPassword(auth, id, password)
+      return
+    }
+    const res = await loginWithUsernameFn({ username: id.toLowerCase(), password })
+    await signInWithCustomToken(auth, res.data.token)
   }
 
   async function logout() {

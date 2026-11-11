@@ -15,6 +15,8 @@
   "triggers": { "crons": ["*/10 12-23 * * *"] },
   "vars": {
     "FIREBASE_PROJECT_ID": "barbearia-prime-app",
+    // chave pública do app web (não é segredo; está no próprio app)
+    "FIREBASE_WEB_API_KEY": "AIzaSyALkLGzksmS-lsUdA7_-MgyE-sDRjKlBDs",
     "APP_BASE_URL": "https://barbearia-prime.pages.dev"
   }
   // Segredos (wrangler secret put): GOOGLE_SERVICE_ACCOUNT (JSON da conta de serviço), OWNER_INVITE_CODE

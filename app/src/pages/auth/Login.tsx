@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { Logo } from '../../components/Logo'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Field'
+import { PasswordInput } from '../../components/ui/PasswordInput'
 
 export function Login() {
   const { login } = useAuth()
@@ -20,8 +21,9 @@ export function Login() {
     try {
       await login(email, password)
       navigate('/')
-    } catch {
-      setError('E-mail ou senha inválidos.')
+    } catch (err) {
+      const msg = (err as Error).message ?? ''
+      setError(msg.includes('Muitas tentativas') ? msg : 'Usuário/e-mail ou senha inválidos.')
     } finally {
       setLoading(false)
     }
@@ -36,16 +38,19 @@ export function Login() {
         <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-ink-border bg-ink-card/50 p-6">
           <h1 className="text-center font-display text-xl text-neutral-100">Entrar</h1>
           <Input
-            label="E-mail"
-            type="email"
+            label="E-mail ou usuário"
+            type="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="voce@email.com"
+            placeholder="voce@email.com ou maicon.ferreira"
           />
-          <Input
+          <PasswordInput
             label="Senha"
-            type="password"
+            autoComplete="current-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}

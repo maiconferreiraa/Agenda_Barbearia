@@ -1,9 +1,13 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Logo } from '../../components/Logo'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Field'
+import { PasswordInput } from '../../components/ui/PasswordInput'
+import { USERNAME_RULE, suggestUsername, usernameAvailableFn } from '../../lib/bookingApi'
+
+type UsernameState = 'idle' | 'checking' | 'free' | 'taken' | 'invalid'
 
 export function Register() {
   const { register } = useAuth()
@@ -13,6 +17,28 @@ export function Register() {
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
+  const [username, setUsername] = useState('')
+  const [usernameTouched, setUsernameTouched] = useState(false)
+  const [usernameState, setUsernameState] = useState<UsernameState>('idle')
+
+  // Sugere o usuário a partir do nome até a pessoa mexer no campo.
+  useEffect(() => {
+    if (!usernameTouched) setUsername(suggestUsername(name))
+  }, [name, usernameTouched])
+
+  // Confere se o usuário está livre (com uma pausa enquanto digita).
+  useEffect(() => {
+    const u = username.trim().toLowerCase()
+    if (!u) return setUsernameState('idle')
+    if (!USERNAME_RULE.test(u) || u.includes('..')) return setUsernameState('invalid')
+    setUsernameState('checking')
+    const t = setTimeout(() => {
+      usernameAvailableFn({ username: u })
+        .then((r) => setUsernameState(r.data.available ? 'free' : 'taken'))
+        .catch(() => setUsernameState('idle'))
+    }, 500)
+    return () => clearTimeout(t)
+  }, [username])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -21,7 +47,9 @@ export function Register() {
     setError('')
     setLoading(true)
     try {
-      await register({ name, email, phone, password, inviteCode })
+      if (usernameState === 'taken') throw new Error('Esse usuário já existe. Escolha outro.')
+      if (usernameState === 'invalid') throw new Error('Usuário inválido: use letras, números, ponto ou _ (3 a 30).')
+      await register({ name, email, phone, password, inviteCode, username: username.trim() || undefined })
       navigate('/')
     } catch (err) {
       const code = (err as { code?: string }).code
@@ -31,9 +59,11 @@ export function Register() {
           ? 'Este e-mail já está cadastrado.'
           : code === 'auth/weak-password'
             ? 'A senha precisa ter pelo menos 6 caracteres.'
-            : message === 'Código do proprietário inválido.'
-              ? 'Sua conta foi criada, mas o código do proprietário informado é inválido. Fale com quem administra o sistema, ou entre normalmente como cliente.'
-              : 'Não foi possível criar sua conta. Tente novamente.',
+            : code === 'auth/invalid-email'
+              ? 'E-mail inválido.'
+              : !code && message
+                ? message
+                : 'Não foi possível criar sua conta. Tente novamente.',
       )
     } finally {
       setLoading(false)
@@ -56,6 +86,34 @@ export function Register() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
+          <div>
+            <Input
+              label="Usuário (para entrar sem o e-mail)"
+              value={username}
+              autoCapitalize="none"
+              autoCorrect="off"
+              onChange={(e) => {
+                setUsernameTouched(true)
+                setUsername(e.target.value.toLowerCase().replace(/\s+/g, '.'))
+              }}
+              placeholder="maicon.ferreira"
+            />
+            <p
+              className={`mt-1 text-xs ${
+                usernameState === 'free'
+                  ? 'text-emerald-400'
+                  : usernameState === 'taken' || usernameState === 'invalid'
+                    ? 'text-red-400'
+                    : 'text-neutral-500'
+              }`}
+            >
+              {usernameState === 'free' && '✓ Disponível'}
+              {usernameState === 'taken' && '✗ Já existe — escolha outro'}
+              {usernameState === 'invalid' && 'Use letras, números, ponto ou _ (3 a 30)'}
+              {usernameState === 'checking' && 'Conferindo…'}
+              {usernameState === 'idle' && 'Você vai poder entrar com o usuário ou com o e-mail.'}
+            </p>
+          </div>
           <Input
             label="Telefone / WhatsApp"
             required
@@ -63,9 +121,10 @@ export function Register() {
             onChange={(e) => setPhone(e.target.value)}
             placeholder="(11) 91234-5678"
           />
-          <Input
+          <PasswordInput
             label="Senha"
-            type="password"
+            autoComplete="new-password"
+            hint="Mínimo de 6 caracteres."
             required
             minLength={6}
             value={password}

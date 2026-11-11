@@ -14,6 +14,7 @@ import {
   subscribePlan,
 } from './api/plans'
 import { infinitePayWebhook } from './api/webhook'
+import { claimUsername, loginWithUsername, usernameAvailable } from './api/username'
 import { runBilling } from './scheduled'
 
 /** Endpoints chamados pelo app: POST /api/<nome>, com o token de login. */
@@ -29,6 +30,7 @@ const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
   cancelSubscription,
   cancelMyPlan,
   upgradePlan,
+  claimUsername,
 }
 
 function json(body: unknown, status = 200) {
@@ -41,6 +43,21 @@ function json(body: unknown, status = 200) {
 async function handleApi(request: Request, env: Env, name: string): Promise<Response> {
   budget.used = 0
   if (name === 'infinitepay-webhook') return infinitePayWebhook(request, env)
+
+  // Rotas sem login (antes de entrar): usuário livre? / entrar com usuário.
+  if (name === 'usernameAvailable' || name === 'loginWithUsername') {
+    if (request.method !== 'POST') return json({ error: { code: 'invalid-argument', message: 'Use POST.' } }, 405)
+    try {
+      const data = ((await request.json().catch(() => ({}))) ?? {}) as Record<string, unknown>
+      const fs = new Firestore(env)
+      const result = name === 'usernameAvailable' ? await usernameAvailable(fs, data) : await loginWithUsername(env, fs, data)
+      return json({ result })
+    } catch (err) {
+      if (err instanceof ApiError) return json({ error: { code: err.code, message: err.message } }, HTTP_STATUS[err.code])
+      console.error(`Erro em /api/${name}`, String(err))
+      return json({ error: { code: 'internal', message: 'Erro interno. Tente de novo em instantes.' } }, 500)
+    }
+  }
 
   const handler = ROUTES[name]
   if (!handler) return json({ error: { code: 'not-found', message: 'Rota não encontrada.' } }, 404)

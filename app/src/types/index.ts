@@ -8,6 +8,8 @@ export interface UserProfile {
   email: string
   phone: string
   role: Role
+  /** Usuário para entrar sem e-mail (ex.: maicon.ferreira). */
+  username?: string
   fcmTokens?: string[]
   createdAt?: Timestamp
 }
