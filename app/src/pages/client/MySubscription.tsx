@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
@@ -6,31 +7,85 @@ import { StatusBadge } from '../../components/StatusBadge'
 import { useAuth } from '../../contexts/AuthContext'
 import { useClientSubscriptions } from '../../hooks/useSubscriptions'
 import { usePlans } from '../../hooks/usePlans'
-import { formatDate } from '../../lib/format'
+import { formatCurrency, formatDate } from '../../lib/format'
+import { confirmInvoicePaymentFn } from '../../lib/paymentsApi'
+
+type ReturnState = 'checking' | 'paid' | 'not_paid' | null
 
 export function MySubscription() {
   const { profile } = useAuth()
   const { data: subscriptions, loading } = useClientSubscriptions(profile?.uid)
   const { data: plans } = usePlans()
-  const [params] = useSearchParams()
-  const status = params.get('status')
+  const [params, setParams] = useSearchParams()
+  const [returnState, setReturnState] = useState<ReturnState>(null)
+  const confirmedOnce = useRef(false)
 
-  const current = subscriptions.find((s) => s.status === 'active' || s.status === 'pending') ?? subscriptions[0]
+  // Volta do checkout da InfinitePay: confirma o pagamento na hora (reserva do webhook).
+  useEffect(() => {
+    const orderNsu = params.get('order_nsu')
+    const transactionNsu = params.get('transaction_nsu')
+    const slug = params.get('slug')
+    if (!orderNsu || !transactionNsu || !slug || confirmedOnce.current) return
+    confirmedOnce.current = true
+    setReturnState('checking')
+    confirmInvoicePaymentFn({ orderNsu, transactionNsu, slug })
+      .then((res) => setReturnState(res.data.paid ? 'paid' : 'not_paid'))
+      .catch(() => setReturnState('not_paid'))
+      .finally(() => setParams({}, { replace: true }))
+  }, [params, setParams])
+
+  const current =
+    subscriptions.find((s) => ['active', 'pending', 'past_due'].includes(s.status)) ??
+    subscriptions.find((s) => s.status === 'expired' && s.openInvoice) ??
+    subscriptions[0]
+  const invoice = current?.openInvoice
   const currentPlan = plans.find((p) => p.id === current?.planId)
 
   return (
     <div className="space-y-4">
       <h1 className="font-display text-2xl text-neutral-100">Minha assinatura</h1>
 
-      {status === 'success' && (
+      {returnState === 'checking' && (
+        <Card className="text-sm text-neutral-300">Confirmando seu pagamento…</Card>
+      )}
+      {returnState === 'paid' && (
         <Card className="border-emerald-500/30 bg-emerald-500/5 text-sm text-emerald-300">
-          Autorização enviada ao Mercado Pago! Assim que o pagamento for confirmado, sua assinatura
-          fica ativa aqui automaticamente.
+          Pagamento confirmado! Seu plano está em dia.
         </Card>
       )}
-      {status === 'failure' && (
-        <Card className="border-red-500/30 bg-red-500/5 text-sm text-red-300">
-          A autorização não foi concluída. Tente assinar novamente.
+      {returnState === 'not_paid' && (
+        <Card className="border-amber-500/30 bg-amber-500/5 text-sm text-amber-300">
+          Ainda não recebemos a confirmação do pagamento. Se você já pagou, ela chega em alguns
+          minutos e esta tela atualiza sozinha.
+        </Card>
+      )}
+
+      {invoice && (
+        <Card
+          className={
+            invoice.overdue
+              ? 'border-red-500/40 bg-red-500/5'
+              : 'border-gold/30 bg-gold/5'
+          }
+        >
+          <p className={`text-sm font-medium ${invoice.overdue ? 'text-red-300' : 'text-gold-light'}`}>
+            {invoice.overdue
+              ? `Mensalidade em atraso desde ${formatDate(invoice.dueDate)}`
+              : current?.status === 'pending'
+                ? 'Falta pagar a 1ª mensalidade para ativar o plano'
+                : `Mensalidade disponível — vence em ${formatDate(invoice.dueDate)}`}
+          </p>
+          <p className="mt-1 font-display text-2xl text-neutral-100">
+            {formatCurrency(invoice.amount)}
+          </p>
+          {invoice.overdue && (
+            <p className="mt-1 text-xs text-red-300/80">
+              Os benefícios do plano ficam pausados até o pagamento.
+            </p>
+          )}
+          <a href={invoice.checkoutUrl} className="mt-3 block">
+            <Button className="w-full">Pagar mensalidade (Pix ou cartão)</Button>
+          </a>
         </Card>
       )}
 

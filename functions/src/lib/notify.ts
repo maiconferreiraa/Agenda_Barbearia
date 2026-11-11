@@ -10,6 +10,8 @@ export type NotificationType =
   | 'plan_expiring'
   | 'plan_expired'
   | 'plan_canceled'
+  | 'invoice_created'
+  | 'payment_overdue'
 
 interface NotifyInput {
   type: NotificationType
@@ -18,6 +20,8 @@ interface NotifyInput {
   relatedId?: string
   targetRole?: 'owner'
   targetUserId?: string
+  /** Rota do app aberta ao tocar no push (padrão: início). */
+  link?: string
 }
 
 export async function notify(input: NotifyInput) {
@@ -28,6 +32,7 @@ export async function notify(input: NotifyInput) {
     relatedId: input.relatedId ?? null,
     targetRole: input.targetRole ?? null,
     targetUserId: input.targetUserId ?? null,
+    link: input.link ?? null,
     read: false,
     createdAt: FieldValue.serverTimestamp(),
   })
@@ -40,7 +45,7 @@ export async function notify(input: NotifyInput) {
     notification: { title: input.title, body: input.message },
     webpush: {
       notification: { icon: '/icons/icon-192.png' },
-      fcmOptions: { link: '/' },
+      fcmOptions: { link: input.link ?? '/' },
     },
   })
 

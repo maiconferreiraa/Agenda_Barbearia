@@ -1,10 +1,15 @@
 import { httpsCallable } from 'firebase/functions'
 import { functions } from '../firebase'
 
-export const createPreapprovalFn = httpsCallable<
+export const subscribePlanFn = httpsCallable<
   { planId: string },
-  { initPoint: string }
->(functions, 'createPreapproval')
+  { checkoutUrl: string }
+>(functions, 'subscribePlan')
+
+export const confirmInvoicePaymentFn = httpsCallable<
+  { orderNsu: string; transactionNsu: string; slug: string },
+  { paid: boolean }
+>(functions, 'confirmInvoicePayment')
 
 export const cancelSubscriptionFn = httpsCallable<
   { subscriptionId: string },

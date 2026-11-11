@@ -4,7 +4,7 @@ Sistema completo de agenda, planos mensais e cobrança recorrente para a Barbear
 
 - **PWA** (React + Vite + TypeScript + Tailwind): funciona no computador, notebook e celular, instalável como app, tudo sincronizado em tempo real (Firestore).
 - **Backend** (Firebase: Auth, Firestore, Cloud Functions, Hosting, Cloud Messaging).
-- **Pagamento**: Mercado Pago — assinatura recorrente (Preapproval API) cobrando automaticamente no cartão do cliente todo mês.
+- **Pagamento**: InfinitePay (Checkout Integrado) — o sistema gera um link de mensalidade por mês (Pix ou cartão), avisa o cliente, confirma o pagamento pelo webhook e avisa quem atrasar.
 - **Notificações**: sino no app (tempo real) + push nativo (funciona até com o app fechado), para: novo agendamento, plano escolhido, pagamento recebido/recusado, plano vencendo e plano vencido.
 
 ## Estrutura
@@ -12,7 +12,7 @@ Sistema completo de agenda, planos mensais e cobrança recorrente para a Barbear
 ```
 barbearia_prime/
   app/          → o PWA (React)
-  functions/    → Cloud Functions (integração com Mercado Pago, webhooks, notificações, agenda)
+  functions/    → Cloud Functions (integração com InfinitePay, webhook, notificações, agenda)
   firestore.rules
   firestore.indexes.json
   firebase.json
@@ -22,7 +22,7 @@ barbearia_prime/
 
 - Node.js 20+
 - Uma conta no [Firebase](https://console.firebase.google.com) (grátis para começar)
-- Uma conta no [Mercado Pago](https://www.mercadopago.com.br/developers) com Access Token (você já tem)
+- Uma conta na [InfinitePay](https://www.infinitepay.io) — basta a InfiniteTag (o @ da conta, sem o `$`)
 - `npm install -g firebase-tools` e depois `firebase login`
 
 ## 2. Criar o projeto Firebase
@@ -48,20 +48,16 @@ Preencha o `.env` com as credenciais do passo 2 (`VITE_FIREBASE_*`) e a `VITE_FI
 
 ## 4. Configurar as Cloud Functions
 
-As credenciais sensíveis (Mercado Pago e o código de proprietário) ficam como **secrets**, nunca no código nem no app:
+O código de proprietário fica como **secret**, nunca no código nem no app:
 
 ```bash
 cd functions
-firebase functions:secrets:set MP_ACCESS_TOKEN
-firebase functions:secrets:set MP_WEBHOOK_SECRET
 firebase functions:secrets:set OWNER_INVITE_CODE
 ```
 
-- `MP_ACCESS_TOKEN`: em Mercado Pago Developers → Suas integrações → sua aplicação → Credenciais de produção (ou de teste, para testar antes).
-- `MP_WEBHOOK_SECRET`: gerado quando você cria o webhook (passo 6 abaixo).
 - `OWNER_INVITE_CODE`: invente uma senha só sua — é o código que, digitado na tela de cadastro, transforma aquela conta em "proprietário" da barbearia. Guarde em local seguro e não compartilhe.
 
-Também existe um parâmetro público (não secreto), a URL do app publicado:
+Também existem dois parâmetros públicos (não secretos): a InfiniteTag que recebe as mensalidades e a URL do app publicado:
 
 ```bash
 firebase functions:config:env  # ou simplesmente faça o deploy: ele pergunta o valor de APP_BASE_URL na primeira vez
@@ -70,6 +66,7 @@ firebase functions:config:env  # ou simplesmente faça o deploy: ele pergunta o 
 Se preferir definir antes, crie `functions/.env.<PROJECT_ID>` com:
 
 ```
+INFINITEPAY_HANDLE=sua-infinitetag
 APP_BASE_URL=https://SEU-PROJETO.web.app
 ```
 
@@ -85,12 +82,12 @@ Isso publica: regras/índices do Firestore, as Cloud Functions e o Hosting (PWA)
 
 Depois do deploy, sua URL pública será algo como `https://SEU-PROJETO.web.app`.
 
-## 6. Configurar o webhook no Mercado Pago
+## 6. Webhook da InfinitePay
 
-1. No painel do Mercado Pago → Sua aplicação → Webhooks → **Configurar notificações**.
-2. URL: `https://SEU-PROJETO.web.app/api/mercadopago-webhook`
-3. Eventos: marque **"Assinaturas e Planos" (preapproval)** e **"Pagamentos" (payment)**.
-4. Copie a "Chave secreta" gerada e salve como `MP_WEBHOOK_SECRET` (passo 4). Depois rode `firebase deploy --only functions` de novo para aplicar.
+Não precisa cadastrar nada no painel: cada link de mensalidade já sai com o webhook
+`https://SEU-PROJETO.web.app/api/infinitepay-webhook` (vem do `APP_BASE_URL`).
+O aviso da InfinitePay não tem assinatura, então o sistema sempre confirma o pagamento
+em `/payment_check` antes de dar baixa.
 
 ## 7. Primeiro acesso
 
@@ -112,14 +109,27 @@ Aponte o app para os emuladores adicionando isto no `app/src/firebase.ts` (tempo
 
 ## Como funciona o pagamento
 
-- Cliente escolhe um plano → o app chama a Function `createPreapproval`, que cria uma **assinatura (Preapproval)** no Mercado Pago e leva o cliente para autorizar o cartão.
-- O Mercado Pago cobra automaticamente todo mês e avisa o sistema via **webhook** (`mercadoPagoWebhook`), que atualiza o status da assinatura e dispara as notificações (pagamento recebido/recusado).
-- O proprietário pode cancelar a qualquer momento em **Assinaturas → Cancelar** — isso chama a Function `cancelSubscription`, que cancela a cobrança direto no Mercado Pago.
-- Todos os dias às 9h (`checkExpirations`), o sistema verifica assinaturas vencendo (≤ 3 dias) ou já vencidas e notifica dono e cliente.
-- Agendamentos **sem** plano ativo (ou sem crédito restante no mês) são marcados como "pagamento no balcão" — o cliente paga na hora, na barbearia. Se no futuro você quiser cobrar também os avulsos pelo Mercado Pago (Checkout Pro), me avise que eu adiciono esse fluxo.
+A API da InfinitePay só gera **links de pagamento avulsos** — não existe débito automático
+no cartão por API. Por isso a mensalidade é um link novo por mês:
+
+- Cliente escolhe um plano → a Function `subscribePlan` cria a assinatura (`pending`) e a
+  1ª mensalidade em `invoices`, com link InfinitePay (Pix ou cartão). O cliente é levado ao checkout.
+- Pagou → a InfinitePay chama o **webhook** (`infinitePayWebhook`), que confirma em `/payment_check`
+  e ativa o plano por 1 mês. Quando o cliente volta do checkout, o app também chama
+  `confirmInvoicePayment` — se o webhook atrasar, a baixa sai do mesmo jeito.
+- Todo dia às 9h (`dailyBilling`), a régua de cobrança:
+  - gera a mensalidade do mês seguinte **5 dias antes** do vencimento e avisa o cliente (push + sininho, com link);
+  - avisa na **véspera** do vencimento;
+  - no **atraso**: marca a assinatura "em atraso" (créditos pausados) e avisa **dono e cliente**;
+  - lembra o cliente a cada **3 dias**; com **10 dias** de atraso o plano vira "vencido" (pagando depois, reativa);
+  - assinatura que nunca pagou a 1ª mensalidade é descartada após 7 dias;
+  - zera os créditos no dia em que começa o mês já pago.
+- Prazos ficam no topo de `functions/src/scheduled/dailyBilling.ts`.
+- O proprietário pode cancelar em **Assinaturas → Cancelar** (`cancelSubscription`): para de gerar mensalidades e cancela a que estiver em aberto.
+- Agendamentos **sem** plano ativo (ou sem crédito restante no mês) são marcados como "pagamento no balcão".
 
 ## Limitações conhecidas / próximos passos sugeridos
 
-- O pagamento avulso (fora do plano) hoje é sempre "pagar no balcão" — cobrança avulsa online não foi incluída para manter o foco no fluxo de assinatura, mas é uma extensão natural.
-- A data de renovação (`currentPeriodEnd`) usa a data informada pelo Mercado Pago quando disponível; sem ela, estima 30 dias — normalmente essa data vem certinha da API.
-- Teste primeiro com credenciais de **teste (sandbox)** do Mercado Pago antes de usar as credenciais de produção.
+- O link da InfinitePay continua pagável mesmo depois de cancelado no sistema (sem API Key não dá para limitar a um pagamento). Se alguém pagar uma mensalidade cancelada, o dono recebe um aviso para avaliar estorno.
+- O formato da resposta de `POST /links` não está documentado pela InfinitePay; `functions/src/lib/infinitepay.ts` aceita `url`/`link`/`checkout_url`. Confira no 1º teste real.
+- Teste com uma mensalidade de R$ 1,00 (valor mínimo da InfinitePay) antes de liberar para clientes.

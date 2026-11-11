@@ -15,6 +15,8 @@ const ICONS: Record<AppNotification['type'], string> = {
   plan_expiring: '⏳',
   plan_expired: '🔴',
   plan_canceled: '🛑',
+  invoice_created: '🧾',
+  payment_overdue: '🚨',
 }
 
 export function NotificationBell() {

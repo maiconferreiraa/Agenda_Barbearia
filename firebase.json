@@ -16,8 +16,8 @@
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
-        "source": "/api/mercadopago-webhook",
-        "function": "mercadoPagoWebhook"
+        "source": "/api/infinitepay-webhook",
+        "function": "infinitePayWebhook"
       },
       {
         "source": "**",

@@ -1,10 +1,7 @@
 import { defineSecret, defineString } from 'firebase-functions/params'
 
-/** Access Token do Mercado Pago (Credenciais > Access Token de produção ou teste). */
-export const MP_ACCESS_TOKEN = defineSecret('MP_ACCESS_TOKEN')
-
-/** Chave secreta do webhook, gerada em Suas integrações > Webhooks, no painel do Mercado Pago. */
-export const MP_WEBHOOK_SECRET = defineSecret('MP_WEBHOOK_SECRET')
+/** InfiniteTag da conta InfinitePay que recebe as mensalidades, sem o "$". */
+export const INFINITEPAY_HANDLE = defineString('INFINITEPAY_HANDLE')
 
 /** URL pública do PWA publicado, sem barra no final. */
 export const APP_BASE_URL = defineString('APP_BASE_URL', {

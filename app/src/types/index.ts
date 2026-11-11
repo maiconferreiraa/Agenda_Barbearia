@@ -54,12 +54,23 @@ export interface Subscription {
   planName: string
   planPrice: number
   status: SubscriptionStatus
-  mpPreapprovalId?: string
   usage: Record<string, number>
+  /** Mensalidade em aberto (link InfinitePay), se houver. */
+  openInvoice?: OpenInvoice | null
+  /** Quando os créditos do próximo mês já pago começam. */
+  creditsResetAt?: Timestamp
   currentPeriodStart?: Timestamp
   currentPeriodEnd?: Timestamp
   canceledAt?: Timestamp
   createdAt?: Timestamp
+}
+
+export interface OpenInvoice {
+  id: string
+  checkoutUrl: string
+  amount: number
+  dueDate: Timestamp
+  overdue: boolean
 }
 
 export type AppointmentStatus =
@@ -104,7 +115,10 @@ export interface Payment {
   clientName: string
   amount: number
   status: PaymentStatus
-  mpPaymentId?: string
+  invoiceId?: string
+  transactionNsu?: string
+  captureMethod?: string
+  receiptUrl?: string
   description?: string
   paidAt?: Timestamp
   createdAt?: Timestamp
@@ -119,6 +133,8 @@ export type NotificationType =
   | 'plan_expiring'
   | 'plan_expired'
   | 'plan_canceled'
+  | 'invoice_created'
+  | 'payment_overdue'
 
 export interface AppNotification {
   id: string
@@ -129,6 +145,7 @@ export interface AppNotification {
   message: string
   read: boolean
   relatedId?: string
+  link?: string
   createdAt?: Timestamp
 }
 

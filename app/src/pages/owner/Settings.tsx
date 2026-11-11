@@ -106,12 +106,13 @@ export function Settings() {
         </Card>
 
         <Card>
-          <h2 className="font-display text-base text-gold-light">Mercado Pago</h2>
+          <h2 className="font-display text-base text-gold-light">InfinitePay</h2>
           <p className="mt-1 text-sm text-neutral-400">
-            A cobrança recorrente dos planos é feita via Mercado Pago. Configure o{' '}
-            <code className="rounded bg-ink-soft px-1 py-0.5 text-xs">MP_ACCESS_TOKEN</code> nas
-            variáveis de ambiente das Cloud Functions (veja o README do projeto). Esta tela não
-            armazena credenciais sensíveis.
+            As mensalidades dos planos são cobradas pela InfinitePay (Pix ou cartão). Todo mês o
+            sistema gera o link de pagamento, avisa o cliente e marca quem atrasar. A InfiniteTag
+            da conta fica no{' '}
+            <code className="rounded bg-ink-soft px-1 py-0.5 text-xs">INFINITEPAY_HANDLE</code> das
+            Cloud Functions (veja o README do projeto).
           </p>
         </Card>
 

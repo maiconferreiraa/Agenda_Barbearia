@@ -6,7 +6,7 @@ import { usePlans } from '../../hooks/usePlans'
 import { useAuth } from '../../contexts/AuthContext'
 import { useClientSubscriptions } from '../../hooks/useSubscriptions'
 import { formatCurrency } from '../../lib/format'
-import { createPreapprovalFn } from '../../lib/paymentsApi'
+import { subscribePlanFn } from '../../lib/paymentsApi'
 
 export function PlansCatalog() {
   const { profile } = useAuth()
@@ -15,14 +15,16 @@ export function PlansCatalog() {
   const [subscribing, setSubscribing] = useState<string | null>(null)
   const [error, setError] = useState('')
 
-  const activeSub = subscriptions.find((s) => s.status === 'active' || s.status === 'pending')
+  const activeSub = subscriptions.find(
+    (s) => s.status === 'active' || s.status === 'pending' || s.status === 'past_due',
+  )
 
   async function handleSubscribe(planId: string) {
     setSubscribing(planId)
     setError('')
     try {
-      const res = await createPreapprovalFn({ planId })
-      window.location.href = res.data.initPoint
+      const res = await subscribePlanFn({ planId })
+      window.location.href = res.data.checkoutUrl
     } catch (err) {
       setError((err as Error).message || 'Não foi possível iniciar a assinatura.')
       setSubscribing(null)
@@ -33,7 +35,7 @@ export function PlansCatalog() {
     <div className="space-y-4">
       <h1 className="font-display text-2xl text-neutral-100">Planos mensais</h1>
       <p className="text-sm text-neutral-500">
-        Assine um plano e pague automaticamente todo mês no cartão via Mercado Pago.
+        Assine um plano e pague a mensalidade por Pix ou cartão via InfinitePay. Todo mês você recebe o aviso com o link de pagamento.
       </p>
 
       {activeSub && (

@@ -13,7 +13,7 @@ export function Subscriptions() {
   const [canceling, setCanceling] = useState<string | null>(null)
 
   async function handleCancel(id: string, clientName: string) {
-    if (!confirm(`Cancelar a assinatura de ${clientName}? A cobrança automática no cartão será interrompida.`))
+    if (!confirm(`Cancelar a assinatura de ${clientName}? Não serão geradas novas mensalidades.`))
       return
     setCanceling(id)
     try {
@@ -61,7 +61,11 @@ export function Subscriptions() {
                 <div className="text-right">
                   <StatusBadge status={s.status} />
                   <p className={`mt-1 text-xs ${HEALTH_TEXT[health.level]}`}>
-                    {s.currentPeriodEnd ? `Vence em ${formatDate(s.currentPeriodEnd)}` : health.label}
+                    {s.openInvoice?.overdue
+                      ? `Em atraso desde ${formatDate(s.openInvoice.dueDate)}`
+                      : s.currentPeriodEnd
+                        ? `Vence em ${formatDate(s.currentPeriodEnd)}`
+                        : health.label}
                   </p>
                 </div>
                 {canCancel && (

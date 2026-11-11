@@ -60,8 +60,14 @@ service cloud.firestore {
 
     // ---- assinaturas (planos assinados) ----
     // Só Cloud Functions (Admin SDK) criam/alteram — cobrança e cancelamento
-    // exigem chamar a API do Mercado Pago, então passam sempre por callable.
+    // passam pela InfinitePay, então sempre via callable/webhook.
     match /subscriptions/{subscriptionId} {
+      allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid);
+      allow write: if false;
+    }
+
+    // ---- mensalidades (uma por mês, com link InfinitePay) ----
+    match /invoices/{invoiceId} {
       allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid);
       allow write: if false;
     }
