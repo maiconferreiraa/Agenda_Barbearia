@@ -5,6 +5,7 @@ import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Field'
 import { useBusinessSettings } from '../../hooks/useBusinessSettings'
+import { InfinitePayCard } from '../../components/InfinitePayCard'
 import { WEEKDAY_LABELS } from '../../lib/schedule'
 import type { BusinessSettings, DayHours } from '../../types'
 
@@ -38,6 +39,8 @@ export function Settings() {
   return (
     <div className="max-w-2xl space-y-4">
       <h1 className="font-display text-2xl text-neutral-100">Configurações</h1>
+
+      <InfinitePayCard />
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <Card className="space-y-3">
@@ -105,16 +108,6 @@ export function Settings() {
           })}
         </Card>
 
-        <Card>
-          <h2 className="font-display text-base text-gold-light">InfinitePay</h2>
-          <p className="mt-1 text-sm text-neutral-400">
-            As mensalidades dos planos são cobradas pela InfinitePay (Pix ou cartão). Todo mês o
-            sistema gera o link de pagamento, avisa o cliente e marca quem atrasar. A InfiniteTag
-            da conta fica no{' '}
-            <code className="rounded bg-ink-soft px-1 py-0.5 text-xs">INFINITEPAY_HANDLE</code> das
-            Cloud Functions (veja o README do projeto).
-          </p>
-        </Card>
 
         <Button type="submit" loading={saving} className="w-full">
           {saved ? 'Salvo ✓' : 'Salvar configurações'}

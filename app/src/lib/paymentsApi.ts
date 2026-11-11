@@ -15,3 +15,8 @@ export const cancelSubscriptionFn = httpsCallable<
   { subscriptionId: string },
   { ok: true }
 >(functions, 'cancelSubscription')
+
+export const connectInfinitePayFn = httpsCallable<
+  { handle?: string; disconnect?: boolean },
+  { handle: string | null }
+>(functions, 'connectInfinitePay')

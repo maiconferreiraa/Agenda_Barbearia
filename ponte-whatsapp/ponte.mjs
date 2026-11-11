@@ -7,15 +7,14 @@
  * Ponte WhatsApp da Barbearia Prime.
  *
  * As Cloud Functions gravam as mensagens de cobrança em `whatsappOutbox`
- * (Firestore). Esta ponte roda no PC onde está o robô de WhatsApp: lê a fila,
- * pede o envio ao robô (POST /api/barbearia/whatsapp, com token) e marca cada
+ * (Firestore). Esta ponte roda num PC ligado, lê a fila e envia pelo WhatsApp
+ * PRÓPRIO da barbearia (whatsapp.mjs — número/chip só dela), marcando cada
  * mensagem como enviada ou com falha.
  *
  * Configuração em ~/.config/barbearia-prime/ponte.json (fora do repositório):
  *   {
  *     "credenciais": "/caminho/service-account.json",  // chave da conta de serviço do Firebase
- *     "roboUrl": "http://127.0.0.1:4545/api/barbearia/whatsapp",
- *     "token": "mesmo token de robo_ml_afiliados/data/barbearia-ponte.json"
+ *     "maxPorDia": 40                                   // opcional
  *   }
  *
  * Uso: node ponte.mjs            (fica rodando)
@@ -26,8 +25,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { initializeApp, cert } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { conectar, enviarTexto, estaConectado, estaDeslogado } from './whatsapp.mjs'
 
-const CONFIG_PATH = path.join(os.homedir(), '.config', 'barbearia-prime', 'ponte.json')
+const PASTA = path.join(os.homedir(), '.config', 'barbearia-prime')
+const CONFIG_PATH = path.join(PASTA, 'ponte.json')
+const CONTAGEM_PATH = path.join(PASTA, 'envios-hoje.json')
 
 const INTERVALO_MS = 60_000 // olha a fila a cada 1 min
 const PAUSA_ENTRE_ENVIOS_MS = 20_000 // evita rajada (WhatsApp bloqueia número que dispara rápido)
@@ -45,9 +47,7 @@ function lerConfig() {
     throw new Error(`Config não encontrada: ${CONFIG_PATH} (veja o README da ponte)`)
   }
   const cfg = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf-8'))
-  for (const campo of ['credenciais', 'roboUrl', 'token']) {
-    if (!cfg[campo]) throw new Error(`Campo "${campo}" faltando em ${CONFIG_PATH}`)
-  }
+  if (!cfg.credenciais) throw new Error(`Campo "credenciais" faltando em ${CONFIG_PATH}`)
   return cfg
 }
 
@@ -63,28 +63,30 @@ const cfg = lerConfig()
 initializeApp({ credential: cert(JSON.parse(fs.readFileSync(cfg.credenciais, 'utf-8'))) })
 const db = getFirestore()
 
-/** Envia pelo robô. Devolve 'ok' | 'robo_fora' | mensagem de erro. */
-async function enviarPeloRobo(numero, texto) {
-  let res
+const MAX_POR_DIA = cfg.maxPorDia ?? 40
+
+function hojeSP() {
+  return new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+}
+
+/** Quantas mensagens já saíram hoje (guardado em arquivo: sobrevive a reinício). */
+function enviadosHoje() {
   try {
-    res = await fetch(cfg.roboUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-ponte-token': cfg.token },
-      body: JSON.stringify({ numero, texto }),
-      signal: AbortSignal.timeout(30_000),
-    })
+    const c = JSON.parse(fs.readFileSync(CONTAGEM_PATH, 'utf-8'))
+    return c.dia === hojeSP() ? c.total : 0
   } catch {
-    return 'robo_fora'
+    return 0
   }
-  if (res.ok) return 'ok'
-  const corpo = await res.text().catch(() => '')
-  if (res.status === 429 || res.status === 503) return 'robo_fora' // limite do dia / desligado: tenta depois
-  return `HTTP ${res.status} ${corpo.slice(0, 200)}`
+}
+
+function contarEnvio() {
+  fs.writeFileSync(CONTAGEM_PATH, JSON.stringify({ dia: hojeSP(), total: enviadosHoje() + 1 }))
 }
 
 async function processarFila() {
   const hora = horaSaoPaulo()
   if (hora < HORA_INICIO || hora >= HORA_FIM) return
+  if (!estaConectado()) return
 
   const snap = await db.collection('whatsappOutbox').where('status', '==', 'pending').limit(20).get()
   if (snap.empty) return
@@ -103,18 +105,34 @@ async function processarFila() {
       continue
     }
 
+    if (enviadosHoje() >= MAX_POR_DIA) {
+      log(`limite de ${MAX_POR_DIA} mensagens por dia atingido — o resto sai amanhã`)
+      return
+    }
     if (enviados > 0) await dormir(PAUSA_ENTRE_ENVIOS_MS)
-    const resultado = await enviarPeloRobo(msg.to, msg.text)
+
+    let resultado
+    try {
+      resultado = await enviarTexto(msg.to, msg.text)
+    } catch (err) {
+      resultado = `erro: ${err.message}`
+    }
 
     if (resultado === 'ok') {
+      contarEnvio()
       await doc.ref.update({ status: 'sent', sentAt: FieldValue.serverTimestamp() })
       enviados++
       log('enviada:', doc.id, msg.kind, '→', msg.to.slice(0, 6) + '…')
       continue
     }
-    if (resultado === 'robo_fora') {
-      log('robô indisponível ou no limite do dia — tento de novo no próximo ciclo')
+    if (resultado === 'desconectado') {
+      log('WhatsApp desconectado — tento de novo no próximo ciclo')
       return
+    }
+    if (resultado === 'sem_whatsapp') {
+      await doc.ref.update({ status: 'failed', lastError: 'número sem WhatsApp' })
+      log('número sem WhatsApp:', doc.id, msg.to.slice(0, 6) + '…')
+      continue
     }
 
     const tentativas = (msg.attempts ?? 0) + 1
@@ -130,6 +148,9 @@ async function processarFila() {
 async function main() {
   const umaVez = process.argv.includes('--uma-vez')
   log('iniciada', umaVez ? '(uma vez)' : `(a cada ${INTERVALO_MS / 1000}s)`)
+  await conectar()
+  // dá tempo da conexão abrir (ou do QR aparecer) antes da 1ª leitura
+  for (let i = 0; i < 30 && !estaConectado() && !estaDeslogado(); i++) await dormir(2000)
   do {
     try {
       await processarFila()
@@ -140,4 +161,4 @@ async function main() {
   } while (!umaVez)
 }
 
-main()
+main().then(() => process.exit(0))

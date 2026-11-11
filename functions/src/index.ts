@@ -1,5 +1,6 @@
 export { claimOwnerRole } from './callable/claimOwnerRole'
 export { subscribePlan } from './callable/subscribePlan'
+export { connectInfinitePay } from './callable/connectInfinitePay'
 export { confirmInvoicePayment } from './callable/confirmInvoicePayment'
 export { cancelSubscription } from './callable/cancelSubscription'
 export { getAvailableSlots } from './callable/getAvailableSlots'

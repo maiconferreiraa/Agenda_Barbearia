@@ -1,8 +1,5 @@
 import { defineSecret, defineString } from 'firebase-functions/params'
 
-/** InfiniteTag da conta InfinitePay que recebe as mensalidades, sem o "$". */
-export const INFINITEPAY_HANDLE = defineString('INFINITEPAY_HANDLE')
-
 /** URL pública do PWA publicado, sem barra no final. */
 export const APP_BASE_URL = defineString('APP_BASE_URL', {
   default: 'https://barbearia-prime-app.web.app',

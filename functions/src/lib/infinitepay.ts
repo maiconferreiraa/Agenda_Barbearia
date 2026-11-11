@@ -1,5 +1,5 @@
 import { logger } from 'firebase-functions/v2'
-import { INFINITEPAY_HANDLE } from './params'
+import { db } from './admin'
 
 /**
  * Cliente mínimo do Checkout Integrado da InfinitePay
@@ -11,9 +11,29 @@ import { INFINITEPAY_HANDLE } from './params'
  */
 const BASE_URL = 'https://api.checkout.infinitepay.io'
 
-function handle(): string {
-  const h = INFINITEPAY_HANDLE.value().replace(/^\$/, '').trim()
-  if (!h) throw new Error('INFINITEPAY_HANDLE não configurado.')
+/** Onde o dono salva a InfiniteTag (Configurações → Pagamentos). */
+export const PAYMENT_SETTINGS_DOC = db.collection('businessSettings').doc('pagamento')
+
+/**
+ * Aceita a InfiniteTag do jeito que o dono colar: "$barbeariaprime",
+ * "@barbeariaprime", "barbeariaprime" ou um link como
+ * "https://loja.infinitepay.io/barbeariaprime". Devolve só o nome, ou null.
+ */
+export function normalizeHandle(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  let h = raw.trim()
+  if (/infinitepay\.io/i.test(h)) {
+    h = h.replace(/^https?:\/\//i, '').split(/[?#]/)[0].split('/').filter(Boolean).pop() ?? ''
+  }
+  h = h.replace(/^[$@]/, '').trim().toLowerCase()
+  return /^[a-z0-9._-]{2,40}$/.test(h) ? h : null
+}
+
+/** InfiniteTag salva pelo dono. */
+async function handle(): Promise<string> {
+  const snap = await PAYMENT_SETTINGS_DOC.get()
+  const h = normalizeHandle(snap.data()?.infinitePayHandle)
+  if (!h) throw new Error('InfiniteTag não configurada (Configurações → Pagamentos).')
   return h
 }
 
@@ -44,8 +64,10 @@ export interface CheckoutLinkInput {
   amount: number
   description: string
   customer?: { name?: string; email?: string; phone_number?: string }
-  redirectUrl: string
-  webhookUrl: string
+  redirectUrl?: string
+  webhookUrl?: string
+  /** Só para o teste de conexão (antes de salvar); no resto usa a InfiniteTag salva. */
+  handle?: string
 }
 
 /** Cria um link de pagamento e devolve a URL do checkout. */
@@ -54,10 +76,10 @@ export async function createCheckoutLink(input: CheckoutLinkInput): Promise<stri
   if (priceCents < 100) throw new Error('A InfinitePay exige valor mínimo de R$ 1,00.')
 
   const data = await post('/links', {
-    handle: handle(),
+    handle: input.handle ?? (await handle()),
     order_nsu: input.orderNsu,
-    redirect_url: input.redirectUrl,
-    webhook_url: input.webhookUrl,
+    ...(input.redirectUrl ? { redirect_url: input.redirectUrl } : {}),
+    ...(input.webhookUrl ? { webhook_url: input.webhookUrl } : {}),
     items: [{ quantity: 1, price: priceCents, description: input.description }],
     ...(input.customer ? { customer: input.customer } : {}),
   })
@@ -87,7 +109,7 @@ export async function checkPayment(input: {
   slug: string
 }): Promise<PaymentCheckResult> {
   const data = await post('/payment_check', {
-    handle: handle(),
+    handle: await handle(),
     order_nsu: input.orderNsu,
     transaction_nsu: input.transactionNsu,
     slug: input.slug,

@@ -22,7 +22,7 @@ barbearia_prime/
 
 - Node.js 20+
 - Uma conta no [Firebase](https://console.firebase.google.com) (grátis para começar)
-- Uma conta na [InfinitePay](https://www.infinitepay.io) — basta a InfiniteTag (o @ da conta, sem o `$`)
+- Uma conta na [InfinitePay](https://www.infinitepay.io) — o dono só cola a InfiniteTag em **Configurações → Pagamentos** e toca "Conectar"
 - `npm install -g firebase-tools` e depois `firebase login`
 
 ## 2. Criar o projeto Firebase
@@ -57,7 +57,7 @@ firebase functions:secrets:set OWNER_INVITE_CODE
 
 - `OWNER_INVITE_CODE`: invente uma senha só sua — é o código que, digitado na tela de cadastro, transforma aquela conta em "proprietário" da barbearia. Guarde em local seguro e não compartilhe.
 
-Também existem dois parâmetros públicos (não secretos): a InfiniteTag que recebe as mensalidades e a URL do app publicado:
+Também existe um parâmetro público (não secreto), a URL do app publicado:
 
 ```bash
 firebase functions:config:env  # ou simplesmente faça o deploy: ele pergunta o valor de APP_BASE_URL na primeira vez
@@ -66,7 +66,6 @@ firebase functions:config:env  # ou simplesmente faça o deploy: ele pergunta o 
 Se preferir definir antes, crie `functions/.env.<PROJECT_ID>` com:
 
 ```
-INFINITEPAY_HANDLE=sua-infinitetag
 APP_BASE_URL=https://SEU-PROJETO.web.app
 ```
 
@@ -125,7 +124,8 @@ no cartão por API. Por isso a mensalidade é um link novo por mês:
   - assinatura que nunca pagou a 1ª mensalidade é descartada após 7 dias;
   - zera os créditos no dia em que começa o mês já pago.
 - Prazos ficam no topo de `functions/src/scheduled/dailyBilling.ts`.
-- Os mesmos avisos (com o link de pagamento) também vão por **WhatsApp**, pelo número do robô 8615, via `ponte-whatsapp/` (veja o README de lá).
+- A InfiniteTag é do dono da barbearia: ele cola em **Configurações → Pagamentos** (aceita `$tag`, `@tag` ou o link da loja). O botão "Conectar" (`connectInfinitePay`) cria um link de teste de R$ 1,00 pra confirmar que a InfinitePay aceita, e só então salva em `businessSettings/pagamento`.
+- Os mesmos avisos (com o link de pagamento) também vão por **WhatsApp**, por um número próprio da barbearia, via `ponte-whatsapp/` (veja o README de lá).
 - O proprietário pode cancelar em **Assinaturas → Cancelar** (`cancelSubscription`): para de gerar mensalidades e cancela a que estiver em aberto.
 - Agendamentos **sem** plano ativo (ou sem crédito restante no mês) são marcados como "pagamento no balcão".
 

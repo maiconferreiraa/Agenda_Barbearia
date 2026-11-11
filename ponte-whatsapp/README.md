@@ -1,27 +1,29 @@
 # Ponte WhatsApp
 
-Manda pelo WhatsApp os avisos de mensalidade (link de pagamento InfinitePay,
-véspera, atraso, plano vencido, pagamento confirmado).
+Manda pelo WhatsApp **da barbearia** (número/chip só dela) os avisos de
+mensalidade: link de pagamento InfinitePay, véspera, atraso, lembretes,
+plano vencido e pagamento confirmado.
 
 ```
-Cloud Functions ──grava──▶ Firestore whatsappOutbox ──lê──▶ ponte.mjs (este PC)
-                                                               │ POST + token
-                                                               ▼
-                                         robô 8615 /api/barbearia/whatsapp ──▶ WhatsApp
+Cloud Functions ──grava──▶ Firestore whatsappOutbox ──lê──▶ ponte.mjs (PC ligado) ──▶ WhatsApp da barbearia
 ```
 
-As Cloud Functions rodam no Google e não alcançam o robô (que roda neste PC),
-por isso a fila no meio.
+As Cloud Functions rodam no Google e não seguram uma conexão de WhatsApp,
+por isso a fila no meio. A ponte é independente de qualquer outro sistema do PC.
 
 ## Ligar (uma vez)
 
-1. **Chave do Firebase**: console do Firebase → projeto `barbearia-prime-app` →
+1. **Chip da barbearia** com WhatsApp instalado num celular.
+2. **Chave do Firebase**: console do Firebase → projeto `barbearia-prime-app` →
    ⚙️ Configurações do projeto → Contas de serviço → **Gerar nova chave privada**.
-   Salve o arquivo como `~/.config/barbearia-prime/service-account.json`
+   Salve como `~/.config/barbearia-prime/service-account.json`
    (nunca dentro do repositório).
-2. **Dependência**: `npm install` nesta pasta.
-3. **Teste**: `npm run uma-vez` — processa a fila uma vez e sai.
-4. **Deixar rodando sempre**:
+3. `npm install` nesta pasta.
+4. `npm start` → aparece um **QR Code** no terminal (também salvo em
+   `~/.config/barbearia-prime/qr-whatsapp.png`). No celular da barbearia:
+   WhatsApp → Aparelhos conectados → Conectar um aparelho → escanear.
+   A sessão fica em `~/.config/barbearia-prime/whatsapp-sessao` (não precisa escanear de novo).
+5. **Deixar rodando sempre**:
    ```bash
    cp barbearia-ponte-whatsapp.service ~/.config/systemd/user/
    systemctl --user daemon-reload
@@ -29,15 +31,14 @@ por isso a fila no meio.
    journalctl --user -u barbearia-ponte-whatsapp -f   # ver o log
    ```
 
-`~/.config/barbearia-prime/ponte.json` (já criado) guarda o caminho da chave,
-a URL do robô e o token, que é o mesmo de `robo_ml_afiliados/data/barbearia-ponte.json`.
-
 ## Regras de envio
 
 - Só entre 8h e 21h (Brasília); fora disso a mensagem espera.
-- 20 s entre mensagens na ponte; o robô ainda exige 15 s e no máximo 40 por dia.
-- Até 3 tentativas por mensagem (`failed` depois disso, com `lastError`).
+- 20 s entre mensagens e no máximo 40 por dia (`maxPorDia` em
+  `~/.config/barbearia-prime/ponte.json`) — evita bloqueio do número.
+- Número sem WhatsApp → `failed` ("número sem WhatsApp").
+- Até 3 tentativas por mensagem em caso de erro (`failed` depois, com `lastError`).
 - Mensagem com mais de 48 h na fila (PC desligado) vira `expired` e não sai.
 - Telefone vem do cadastro do cliente ("Telefone / WhatsApp"); o aviso de atraso
   para o dono vai pro telefone em Configurações.
-- Desligar sem mexer em nada: `"ativo": false` em `robo_ml_afiliados/data/barbearia-ponte.json`.
+- Desvincular: WhatsApp → Aparelhos conectados → sair, e apagar a pasta `whatsapp-sessao`.

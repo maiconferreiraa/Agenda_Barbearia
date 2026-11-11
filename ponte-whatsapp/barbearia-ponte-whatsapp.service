@@ -2,7 +2,7 @@
 #   systemctl --user daemon-reload
 #   systemctl --user enable --now barbearia-ponte-whatsapp
 [Unit]
-Description=Barbearia Prime - ponte WhatsApp (fila do Firestore -> robo 8615)
+Description=Barbearia Prime - ponte WhatsApp (fila do Firestore -> WhatsApp da barbearia)
 After=network-online.target
 
 [Service]

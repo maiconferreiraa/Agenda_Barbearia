@@ -5,9 +5,9 @@ import { db } from './admin'
 /**
  * Fila de WhatsApp (`whatsappOutbox`).
  *
- * As Cloud Functions não alcançam o robô de WhatsApp (ele roda no PC do dono),
- * então só gravam a mensagem aqui. A ponte local (`ponte-whatsapp/`) lê a fila
- * e pede o envio ao robô, com pausa entre mensagens.
+ * As Cloud Functions não seguram uma conexão de WhatsApp, então só gravam a
+ * mensagem aqui. A ponte (`ponte-whatsapp/`, num PC ligado) lê a fila e envia
+ * pelo número próprio da barbearia, com pausa entre mensagens.
  */
 
 /** Deixa o telefone no formato 55DDDNÚMERO; devolve null se não parecer celular BR. */

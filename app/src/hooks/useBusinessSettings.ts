@@ -10,7 +10,6 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   address: '',
   slotDurationMinutes: 30,
   hours: DEFAULT_BUSINESS_HOURS,
-  mercadoPagoConnected: false,
 }
 
 export function useBusinessSettings() {

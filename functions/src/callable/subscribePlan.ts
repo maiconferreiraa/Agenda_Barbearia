@@ -5,6 +5,7 @@ import { db } from '../lib/admin'
 import { REGION } from '../lib/region'
 import { notify } from '../lib/notify'
 import { addMonths, createInvoice } from '../lib/billing'
+import { PAYMENT_SETTINGS_DOC, normalizeHandle } from '../lib/infinitepay'
 
 /**
  * Cliente escolhe um plano: cria a assinatura "pending" e a 1ª mensalidade
@@ -31,6 +32,14 @@ export const subscribePlan = onCall({ region: REGION }, async (request) => {
     throw new HttpsError('not-found', 'Plano indisponível.')
   }
   const plan = planSnap.data()!
+
+  const payment = await PAYMENT_SETTINGS_DOC.get()
+  if (!normalizeHandle(payment.data()?.infinitePayHandle)) {
+    throw new HttpsError(
+      'failed-precondition',
+      'A barbearia ainda não ativou o pagamento online. Fale com a barbearia.',
+    )
+  }
 
   const existing = await db
     .collection('subscriptions')
