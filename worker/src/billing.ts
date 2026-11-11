@@ -25,13 +25,19 @@ export async function createInvoice(
   params: {
     subId: string
     sub: Data
-    kind: 'first' | 'renewal'
+    kind: 'first' | 'renewal' | 'upgrade'
     dueDate: Date
     periodStart: Date
     periodEnd: Date
+    /** Valor diferente do plano (upgrade cobra só a diferença). */
+    amount?: number
+    description?: string
+    /** Campos a mais gravados na cobrança (ex.: plano de destino do upgrade). */
+    extra?: Data
   },
 ) {
   const { subId, sub, kind, dueDate, periodStart, periodEnd } = params
+  const amount = params.amount ?? Number(sub.planPrice)
   const handle = await savedHandle(fs)
   if (!handle) throw new Error('InfiniteTag não configurada (Configurações → Pagamentos).')
 
@@ -42,8 +48,8 @@ export async function createInvoice(
   const checkoutUrl = await createCheckoutLink({
     handle,
     orderNsu: invoiceId,
-    amount: Number(sub.planPrice),
-    description: `${sub.planName} - ${formatBr(periodStart)} a ${formatBr(periodEnd)}`,
+    amount,
+    description: params.description ?? `${sub.planName} - ${formatBr(periodStart)} a ${formatBr(periodEnd)}`,
     customer: {
       name: String(sub.clientName ?? ''),
       ...(typeof user.email === 'string' ? { email: user.email } : {}),
@@ -59,8 +65,9 @@ export async function createInvoice(
       clientId: sub.clientId,
       clientName: sub.clientName,
       planName: sub.planName,
-      amount: sub.planPrice,
+      amount,
       kind,
+      ...(params.extra ?? {}),
       status: 'open',
       checkoutUrl,
       dueDate,
@@ -70,9 +77,19 @@ export async function createInvoice(
       lastReminderAt: null,
       createdAt: new Date(),
     }),
-    fs.updateWrite(`subscriptions/${subId}`, {
-      openInvoice: { id: invoiceId, checkoutUrl, amount: sub.planPrice, dueDate, overdue: false },
-    }),
+    kind === 'upgrade'
+      ? fs.updateWrite(`subscriptions/${subId}`, {
+          pendingUpgrade: {
+            invoiceId,
+            checkoutUrl,
+            amount,
+            planId: params.extra?.targetPlanId ?? null,
+            planName: params.extra?.targetPlanName ?? null,
+          },
+        })
+      : fs.updateWrite(`subscriptions/${subId}`, {
+          openInvoice: { id: invoiceId, checkoutUrl, amount, dueDate, overdue: false },
+        }),
   ])
   return { invoiceId, checkoutUrl }
 }
@@ -131,6 +148,19 @@ export async function markInvoicePaid(
 
     if (wasCanceled) return { inv, amount, wasCanceled }
 
+    // Upgrade: troca o plano na hora; vencimento e créditos já usados continuam.
+    if (inv.kind === 'upgrade') {
+      if (sub!.status !== 'active') return { inv, amount, wasCanceled: true }
+      tx.update(subPath, {
+        planId: inv.targetPlanId,
+        planName: inv.targetPlanName,
+        planPrice: inv.targetPlanPrice,
+        pendingUpgrade: null,
+        upgradedAt: now,
+      })
+      return { inv, amount, wasCanceled: false, upgraded: true }
+    }
+
     const currentEnd = sub!.currentPeriodEnd as Date | undefined
     const update: Data = { status: 'active', openInvoice: null, billingNextCheck: now }
     if (!currentEnd || currentEnd.getTime() < now.getTime()) {
@@ -142,11 +172,30 @@ export async function markInvoicePaid(
       update.currentPeriodEnd = inv.periodEnd
     }
     tx.update(subPath, update)
-    return { inv, amount, wasCanceled }
+    return { inv, amount, wasCanceled, upgraded: false }
   })
 
   if (!result) return false
   const { inv, amount, wasCanceled } = result
+
+  if ('upgraded' in result && result.upgraded) {
+    await notify(env, fs, {
+      type: 'plan_chosen',
+      targetRole: 'owner',
+      relatedId: String(inv.subscriptionId),
+      title: 'Upgrade de plano',
+      message: `${inv.clientName} fez upgrade de "${inv.planName}" para "${inv.targetPlanName}" (pagou ${brl(amount)} de diferença).`,
+    })
+    await notify(env, fs, {
+      type: 'payment_received',
+      targetUserId: String(inv.clientId),
+      relatedId: String(inv.subscriptionId),
+      link: SUBSCRIPTION_PAGE,
+      title: 'Upgrade confirmado',
+      message: `Seu plano agora é "${inv.targetPlanName}". Os créditos novos já estão disponíveis!`,
+    })
+    return true
+  }
 
   if (wasCanceled) {
     await notify(env, fs, {

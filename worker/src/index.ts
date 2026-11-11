@@ -8,6 +8,7 @@ import { bookAppointment, cancelMyAppointment, getAvailableSlots, setAppointment
 import {
   cancelMyPlan,
   cancelSubscription,
+  upgradePlan,
   confirmInvoicePayment,
   connectInfinitePay,
   subscribePlan,
@@ -27,6 +28,7 @@ const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
   connectInfinitePay,
   cancelSubscription,
   cancelMyPlan,
+  upgradePlan,
 }
 
 function json(body: unknown, status = 200) {

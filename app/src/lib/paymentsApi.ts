@@ -24,3 +24,6 @@ export const cancelMyPlanFn = callApi<
   { subscriptionId: string; undo?: boolean },
   { status: 'active' | 'canceled' }
 >('cancelMyPlan')
+
+/** Upgrade: paga só a diferença; o plano muda na hora ao pagar. */
+export const upgradePlanFn = callApi<{ planId: string }, { checkoutUrl: string; amount: number }>('upgradePlan')

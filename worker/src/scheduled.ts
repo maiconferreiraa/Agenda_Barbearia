@@ -112,6 +112,14 @@ async function processSubscription(env: Env, fs: Firestore, doc: Doc, now: Date)
   // 2) Sem cobrança em aberto e vencimento chegando → gera a próxima mensalidade.
   if (!open) {
     if (periodEnd.getTime() - now.getTime() <= INVOICE_LEAD_DAYS * DAY_MS) {
+      // Upgrade esperando pagamento perde a validade quando chega a mensalidade nova.
+      const pending = sub.pendingUpgrade as { invoiceId?: string } | null | undefined
+      if (pending) {
+        await fs.commit([
+          ...(pending.invoiceId ? [fs.updateWrite(`invoices/${pending.invoiceId}`, { status: 'canceled', canceledAt: now })] : []),
+          fs.updateWrite(doc.path, { pendingUpgrade: null }),
+        ])
+      }
       const { checkoutUrl } = await createInvoice(env, fs, {
         subId: doc.id,
         sub,

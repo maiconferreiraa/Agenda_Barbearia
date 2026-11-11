@@ -155,6 +155,7 @@ export async function cancelSubscription(ctx: Ctx) {
   if (!sub) throw new ApiError('not-found', 'Assinatura não encontrada.')
 
   await cancelOpenInvoice(fs, subId, (sub.data.openInvoice as { id?: string } | null)?.id)
+  await cancelPendingUpgrade(fs, subId, sub.data.pendingUpgrade)
   await fs.update(sub.path, { status: 'canceled', canceledAt: new Date(), canceledBy: 'owner', billingNextCheck: null })
   await notify(env, fs, {
     type: 'plan_canceled',
@@ -194,6 +195,7 @@ export async function cancelMyPlan({ env, fs, uid, data }: Ctx) {
   if (sub.status === 'active') {
     if (sub.cancelAtPeriodEnd) return { status: 'active' }
     await cancelOpenInvoice(fs, subId, (sub.openInvoice as { id?: string } | null)?.id)
+    await cancelPendingUpgrade(fs, subId, sub.pendingUpgrade)
     await fs.update(doc.path, { cancelAtPeriodEnd: true, cancelRequestedAt: new Date() })
     const end = sub.currentPeriodEnd as Date | undefined
     await notify(env, fs, {
@@ -208,6 +210,7 @@ export async function cancelMyPlan({ env, fs, uid, data }: Ctx) {
 
   if (sub.status === 'pending' || sub.status === 'past_due') {
     await cancelOpenInvoice(fs, subId, (sub.openInvoice as { id?: string } | null)?.id)
+    await cancelPendingUpgrade(fs, subId, sub.pendingUpgrade)
     await fs.update(doc.path, { status: 'canceled', canceledAt: new Date(), canceledBy: 'client', billingNextCheck: null })
     await notify(env, fs, {
       type: 'plan_canceled',
@@ -220,4 +223,65 @@ export async function cancelMyPlan({ env, fs, uid, data }: Ctx) {
   }
 
   throw new ApiError('failed-precondition', 'Este plano já está encerrado.')
+}
+
+/** Cancela um upgrade que ficou esperando pagamento. */
+async function cancelPendingUpgrade(fs: Ctx['fs'], subId: string, pending: unknown) {
+  const p = pending as { invoiceId?: string } | null | undefined
+  if (!p) return
+  const writes = [fs.updateWrite(`subscriptions/${subId}`, { pendingUpgrade: null })]
+  if (p.invoiceId) writes.unshift(fs.updateWrite(`invoices/${p.invoiceId}`, { status: 'canceled', canceledAt: new Date() }))
+  await fs.commit(writes)
+}
+
+/**
+ * Upgrade: cliente com plano em dia escolhe um plano mais caro e paga só a
+ * diferença. Ao pagar, o plano muda na hora (créditos a mais já valem),
+ * o vencimento continua o mesmo e a próxima mensalidade vem no valor novo.
+ */
+export async function upgradePlan({ env, fs, uid, data }: Ctx) {
+  const planId = safeId(data.planId, 'Plano')
+  const [plan, subs] = await Promise.all([
+    fs.get(`plans/${planId}`),
+    fs.query('subscriptions', {
+      where: [
+        { field: 'clientId', op: '==', value: uid },
+        { field: 'status', op: '==', value: 'active' },
+      ],
+      limit: 1,
+    }),
+  ])
+  if (!plan || plan.data.active !== true) throw new ApiError('not-found', 'Plano indisponível.')
+  if (subs.length === 0) throw new ApiError('failed-precondition', 'Você precisa ter um plano ativo para fazer upgrade.')
+  const subDoc = subs[0]
+  const sub = subDoc.data
+
+  if (sub.planId === planId) throw new ApiError('failed-precondition', 'Esse já é o seu plano.')
+  if (sub.cancelAtPeriodEnd) {
+    throw new ApiError('failed-precondition', 'Seu plano está cancelado. Toque em "Quero manter meu plano" antes do upgrade.')
+  }
+  if (sub.openInvoice) {
+    throw new ApiError('failed-precondition', 'Pague a mensalidade em aberto antes de fazer upgrade.')
+  }
+  const diff = Math.round((Number(plan.data.price) - Number(sub.planPrice)) * 100) / 100
+  if (diff <= 0) throw new ApiError('failed-precondition', 'O upgrade só vale para um plano mais caro que o atual.')
+
+  // Mesmo upgrade já iniciado: devolve o mesmo link.
+  const pending = sub.pendingUpgrade as { planId?: string; checkoutUrl?: string } | null | undefined
+  if (pending?.planId === planId && pending.checkoutUrl) return { checkoutUrl: pending.checkoutUrl, amount: diff }
+  await cancelPendingUpgrade(fs, subDoc.id, pending)
+
+  const now = new Date()
+  const { checkoutUrl } = await createInvoice(env, fs, {
+    subId: subDoc.id,
+    sub,
+    kind: 'upgrade',
+    dueDate: now,
+    periodStart: now,
+    periodEnd: (sub.currentPeriodEnd as Date) ?? now,
+    amount: Math.max(diff, 1),
+    description: `Upgrade ${sub.planName} → ${plan.data.name}`,
+    extra: { targetPlanId: planId, targetPlanName: plan.data.name, targetPlanPrice: plan.data.price },
+  })
+  return { checkoutUrl, amount: Math.max(diff, 1) }
 }

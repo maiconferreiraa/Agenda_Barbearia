@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Field'
 import { useBusinessSettings } from '../../hooks/useBusinessSettings'
 import { InfinitePayCard } from '../../components/InfinitePayCard'
+import { WhatsAppCard } from '../../components/WhatsAppCard'
 import { WEEKDAY_LABELS } from '../../lib/schedule'
 import type { BusinessSettings, DayHours } from '../../types'
 
@@ -41,6 +42,8 @@ export function Settings() {
       <h1 className="font-display text-2xl text-neutral-100">Configurações</h1>
 
       <InfinitePayCard />
+
+      <WhatsAppCard />
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <Card className="space-y-3">

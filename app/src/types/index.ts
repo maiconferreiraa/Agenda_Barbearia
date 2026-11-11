@@ -57,6 +57,14 @@ export interface Subscription {
   usage: Record<string, number>
   /** Mensalidade em aberto (link InfinitePay), se houver. */
   openInvoice?: OpenInvoice | null
+  /** Upgrade iniciado esperando o pagamento da diferença. */
+  pendingUpgrade?: {
+    invoiceId: string
+    checkoutUrl: string
+    amount: number
+    planId: string
+    planName: string
+  } | null
   /** Cliente cancelou pelo app: vale até currentPeriodEnd e depois encerra. */
   cancelAtPeriodEnd?: boolean
   /** Quando os créditos do próximo mês já pago começam. */

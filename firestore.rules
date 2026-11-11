@@ -65,6 +65,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---- WhatsApp da barbearia: QR para conectar e status (só o dono) ----
+    // A ponte (conta de serviço) publica o QR; o dono pode pedir para desconectar.
+    match /private/{docId} {
+      allow read: if isOwner();
+      allow update: if isOwner()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['command'])
+        && request.resource.data.command == 'logout';
+    }
+
     // ---- fila de WhatsApp (só o servidor e a ponte local, com a conta de serviço) ----
     match /whatsappOutbox/{messageId} {
       allow read, write: if false;

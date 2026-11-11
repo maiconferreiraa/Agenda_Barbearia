@@ -16,6 +16,20 @@ interface DayHours {
   close: string
 }
 
+/** Mesmo padrão do app (app/src/lib/schedule.ts) — vale enquanto o dono não salvar Configurações. */
+const DEFAULT_SETTINGS: Data = {
+  slotDurationMinutes: 30,
+  hours: {
+    mon: { enabled: true, open: '09:00', close: '19:00' },
+    tue: { enabled: true, open: '09:00', close: '19:00' },
+    wed: { enabled: true, open: '09:00', close: '19:00' },
+    thu: { enabled: true, open: '09:00', close: '19:00' },
+    fri: { enabled: true, open: '09:00', close: '19:00' },
+    sat: { enabled: true, open: '09:00', close: '17:00' },
+    sun: { enabled: false, open: '09:00', close: '13:00' },
+  },
+}
+
 function toMinutes(time: string) {
   const [h, m] = time.split(':').map(Number)
   return h * 60 + m
@@ -81,8 +95,8 @@ export async function getAvailableSlots({ fs, data }: Ctx) {
   if (Number.isNaN(day.getTime())) throw new ApiError('invalid-argument', 'Data inválida.')
   const duration = services.reduce((s, x) => s + x.durationMinutes, 0)
 
-  const settings = (await fs.get('businessSettings/main'))?.data
-  if (!settings) return { slots: [] }
+  const saved = (await fs.get('businessSettings/main'))?.data
+  const settings = { ...DEFAULT_SETTINGS, ...(saved ?? {}) }
   const candidates = candidateStarts(day, duration, settings)
   if (candidates.length === 0) return { slots: [] }
 

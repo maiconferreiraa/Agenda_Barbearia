@@ -8,9 +8,9 @@
  * Não tem nenhuma relação com outros robôs do PC: sessão separada em
  * ~/.config/barbearia-prime/whatsapp-sessao.
  *
- * Vincular o número (uma vez): rodar a ponte e escanear o QR que aparece no
- * terminal (também salvo como imagem em ~/.config/barbearia-prime/qr-whatsapp.png)
- * em WhatsApp → Aparelhos conectados → Conectar um aparelho.
+ * Vincular o número: o dono abre o app → Configurações → WhatsApp da barbearia
+ * e escaneia o QR (a ponte publica o QR no banco, só o dono lê). O QR também
+ * aparece no terminal e em ~/.config/barbearia-prime/qr-whatsapp.png.
  */
 import fs from 'node:fs'
 import os from 'node:os'
@@ -32,6 +32,12 @@ export const QR_PNG = path.join(PASTA, 'qr-whatsapp.png')
 let sock = null
 let conectado = false
 let deslogado = false
+/** Avisado a cada mudança: { status: 'qr' | 'connected' | 'disconnected', qr?, phone? } */
+let aoMudar = () => {}
+
+export function quandoMudar(fn) {
+  aoMudar = fn
+}
 
 function log(...args) {
   console.log(new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), '[whatsapp]', ...args)
@@ -67,19 +73,26 @@ export async function conectar() {
       qrcodeTerminal.generate(qr, { small: true })
       await QRCode.toFile(QR_PNG, qr, { width: 400 }).catch(() => {})
       log(`QR também salvo em: ${QR_PNG}`)
+      aoMudar({ status: 'qr', qr })
     }
     if (connection === 'open') {
       conectado = true
       deslogado = false
       fs.rmSync(QR_PNG, { force: true })
-      log('Conectado.')
+      const phone = String(sock.user?.id ?? '').split(':')[0].split('@')[0]
+      log('Conectado.', phone ? `(${phone.slice(0, 6)}…)` : '')
+      aoMudar({ status: 'connected', phone })
     }
     if (connection === 'close') {
       conectado = false
       const status = lastDisconnect?.error?.output?.statusCode
       if (status === DisconnectReason.loggedOut) {
+        // Desvinculado no celular ou pelo app: limpa a sessão e já mostra QR novo.
         deslogado = true
-        log(`Número desvinculado. Apague ${SESSAO_DIR} e rode de novo para vincular.`)
+        log('Número desvinculado — gerando QR novo para conectar outro.')
+        aoMudar({ status: 'disconnected' })
+        fs.rmSync(SESSAO_DIR, { recursive: true, force: true })
+        setTimeout(() => conectar().catch((e) => log('erro ao reconectar:', e.message)), 3000)
       } else {
         log('Conexão caiu — reconectando em 5 s...')
         setTimeout(() => conectar().catch((e) => log('erro ao reconectar:', e.message)), 5000)
@@ -98,4 +111,15 @@ export async function enviarTexto(numero, texto) {
   if (!info?.exists) return 'sem_whatsapp'
   await sock.sendMessage(info.jid, { text: texto })
   return 'ok'
+}
+
+/** Desvincula o número (botão "Desconectar" no app). Depois aparece um QR novo. */
+export async function desconectar() {
+  if (!sock) return
+  try {
+    await sock.logout()
+  } catch {
+    // se já estava fora, o 'close' acima cuida de limpar e gerar QR novo
+    sock.end?.(undefined)
+  }
 }

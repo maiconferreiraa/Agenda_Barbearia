@@ -78,6 +78,9 @@ export function MySubscription() {
     ['active', 'pending', 'past_due'].includes(current.status) &&
     !current.cancelAtPeriodEnd
   const currentPlan = plans.find((p) => p.id === current?.planId)
+  const included = currentPlan?.includedServices ?? []
+  const allCreditsUsed =
+    included.length > 0 && included.every((i) => (current?.usage?.[i.serviceId] ?? 0) >= i.quantity)
 
   return (
     <div className="space-y-4">
@@ -162,9 +165,17 @@ export function MySubscription() {
             <ul className="space-y-1 text-sm text-neutral-300">
               {(currentPlan?.includedServices ?? []).map((item) => {
                 const used = current.usage?.[item.serviceId] ?? 0
+                const esgotado = used >= item.quantity
                 return (
-                  <li key={item.serviceId}>
-                    {item.serviceName}: {used}/{item.quantity} usado(s)
+                  <li key={item.serviceId} className="flex items-center justify-between gap-2">
+                    <span className={esgotado ? 'text-neutral-500' : ''}>
+                      {item.serviceName}: {Math.min(used, item.quantity)}/{item.quantity} usado(s)
+                    </span>
+                    {esgotado && (
+                      <span className="rounded bg-neutral-700/60 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-neutral-400">
+                        esgotado
+                      </span>
+                    )}
                   </li>
                 )
               })}
@@ -173,6 +184,33 @@ export function MySubscription() {
               )}
             </ul>
           </div>
+
+          {current.status === 'active' && allCreditsUsed && (
+            <div className="mt-4 space-y-2 rounded-md border border-gold/30 bg-gold/5 p-3">
+              <p className="text-sm text-gold-light">
+                Você já usou todos os créditos deste mês. Eles renovam em{' '}
+                <b>{formatDate(current.creditsResetAt ?? current.currentPeriodEnd)}</b>.
+              </p>
+              <p className="text-xs text-neutral-400">
+                Quer mais? Faça upgrade e pague só a diferença — os créditos novos valem na hora.
+              </p>
+              <Link to="/app/plans" className="block">
+                <Button className="w-full">Ver planos maiores</Button>
+              </Link>
+            </div>
+          )}
+
+          {current.status === 'active' && current.pendingUpgrade && (
+            <div className="mt-4 space-y-2 rounded-md border border-sky-500/30 bg-sky-500/5 p-3">
+              <p className="text-sm text-sky-300">
+                Upgrade para <b>{current.pendingUpgrade.planName}</b> esperando o pagamento de{' '}
+                <b>{formatCurrency(current.pendingUpgrade.amount)}</b>.
+              </p>
+              <a href={current.pendingUpgrade.checkoutUrl} className="block">
+                <Button variant="secondary" className="w-full">Pagar upgrade</Button>
+              </a>
+            </div>
+          )}
 
           {current.status === 'canceled' && (
             <p className="mt-3 text-xs text-neutral-500">

@@ -25,7 +25,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { initializeApp, cert } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
-import { conectar, enviarTexto, estaConectado, estaDeslogado } from './whatsapp.mjs'
+import { conectar, desconectar, enviarTexto, estaConectado, estaDeslogado, quandoMudar } from './whatsapp.mjs'
 
 const PASTA = path.join(os.homedir(), '.config', 'barbearia-prime')
 const CONFIG_PATH = path.join(PASTA, 'ponte.json')
@@ -145,9 +145,41 @@ async function processarFila() {
   }
 }
 
+/**
+ * Estado do WhatsApp no banco (private/whatsapp — só o dono lê nas regras):
+ * o app mostra o QR para o dono escanear e o número conectado.
+ * O botão "Desconectar" do app grava `command: 'logout'` aqui.
+ */
+const estadoRef = () => db.doc('private/whatsapp')
+
+function publicarEstado(estado) {
+  estadoRef()
+    .set(
+      {
+        status: estado.status,
+        qr: estado.qr ?? null,
+        phone: estado.phone ?? null,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    )
+    .catch((err) => log('erro ao publicar estado do WhatsApp:', err.message))
+}
+
+function ouvirComandos() {
+  estadoRef().onSnapshot(async (snap) => {
+    if (snap.data()?.command !== 'logout') return
+    log('pedido de desconectar vindo do app')
+    await estadoRef().update({ command: FieldValue.delete() }).catch(() => {})
+    await desconectar()
+  })
+}
+
 async function main() {
   const umaVez = process.argv.includes('--uma-vez')
   log('iniciada', umaVez ? '(uma vez)' : `(a cada ${INTERVALO_MS / 1000}s)`)
+  quandoMudar(publicarEstado)
+  if (!umaVez) ouvirComandos()
   await conectar()
   // dá tempo da conexão abrir (ou do QR aparecer) antes da 1ª leitura
   for (let i = 0; i < 30 && !estaConectado() && !estaDeslogado(); i++) await dormir(2000)
