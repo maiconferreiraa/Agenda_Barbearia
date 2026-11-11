@@ -177,7 +177,7 @@ async function processSubscription(env: Env, fs: Firestore, doc: Doc, now: Date)
         kind: 'due_soon',
         relatedId: doc.id,
         text:
-          `Oi, ${firstName(sub.clientName)}! Lembrete: sua mensalidade do plano *${sub.planName}* ` +
+          `⏰ Oi, ${firstName(sub.clientName)}! Lembrete: sua mensalidade do plano *${sub.planName}* ` +
           `(${brl(invoice.amount)}) vence em *${formatBr(dueDate)}*.\n\n` +
           `Link para pagar:\n${payLink}\n\nSe já pagou, pode ignorar. ${shop.name}`,
       })
@@ -204,7 +204,7 @@ async function processSubscription(env: Env, fs: Firestore, doc: Doc, now: Date)
       targetUserId: String(sub.clientId),
       relatedId: doc.id,
       link: SUBSCRIPTION_PAGE,
-      title: 'Mensalidade em atraso',
+      title: '🚨 Mensalidade em atraso',
       message: `Sua mensalidade do plano "${sub.planName}" venceu em ${formatBr(dueDate)}. Os benefícios ficam pausados até o pagamento. Toque para pagar.`,
     })
     await queueWhatsapp(fs, {
@@ -212,6 +212,7 @@ async function processSubscription(env: Env, fs: Firestore, doc: Doc, now: Date)
       kind: 'payment_overdue',
       relatedId: doc.id,
       text:
+        `🚨 *MENSALIDADE EM ATRASO* 🚨\n\n` +
         `Olá, ${firstName(sub.clientName)}. Sua mensalidade do plano *${sub.planName}* ` +
         `(${brl(invoice.amount)}) do dia *${formatBr(dueDate)}* está em atraso.\n\n` +
         `Os benefícios do plano ficam pausados até o pagamento. Regularize pelo link:\n${payLink}\n\n${shop.name}`,
@@ -240,7 +241,7 @@ async function processSubscription(env: Env, fs: Firestore, doc: Doc, now: Date)
       targetUserId: String(sub.clientId),
       relatedId: doc.id,
       link: SUBSCRIPTION_PAGE,
-      title: 'Seu plano venceu',
+      title: '🚨 Seu plano venceu',
       message: `Seu plano "${sub.planName}" venceu por falta de pagamento. Pague a mensalidade em aberto para reativar.`,
     })
     await queueWhatsapp(fs, {
@@ -248,6 +249,7 @@ async function processSubscription(env: Env, fs: Firestore, doc: Doc, now: Date)
       kind: 'plan_expired',
       relatedId: doc.id,
       text:
+        `🚨 *PLANO VENCIDO* 🚨\n\n` +
         `Olá, ${firstName(sub.clientName)}. Seu plano *${sub.planName}* venceu por falta de pagamento ` +
         `(${daysLate} dias de atraso).\n\nPara reativar, é só pagar a mensalidade:\n${payLink}\n\n${shop.name}`,
     })
@@ -262,7 +264,7 @@ async function processSubscription(env: Env, fs: Firestore, doc: Doc, now: Date)
       targetUserId: String(sub.clientId),
       relatedId: doc.id,
       link: SUBSCRIPTION_PAGE,
-      title: 'Lembrete: mensalidade em atraso',
+      title: '🚨 Lembrete: mensalidade em atraso',
       message: `Sua mensalidade do plano "${sub.planName}" está ${daysLate} dia(s) atrasada. Faltam ${GRACE_DAYS - daysLate} dia(s) para o plano vencer.`,
     })
     await queueWhatsapp(fs, {
@@ -270,6 +272,7 @@ async function processSubscription(env: Env, fs: Firestore, doc: Doc, now: Date)
       kind: 'overdue_reminder',
       relatedId: doc.id,
       text:
+        `🚨 *LEMBRETE: MENSALIDADE EM ATRASO*\n\n` +
         `Oi, ${firstName(sub.clientName)}. Sua mensalidade do plano *${sub.planName}* está com ` +
         `${daysLate} dia(s) de atraso. Faltam ${GRACE_DAYS - daysLate} dia(s) para o plano vencer.\n\n` +
         `Link para pagar:\n${payLink}\n\n${shop.name}`,
