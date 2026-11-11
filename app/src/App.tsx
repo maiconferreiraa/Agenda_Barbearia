@@ -14,6 +14,7 @@ import { Plans } from './pages/owner/Plans'
 import { Subscriptions } from './pages/owner/Subscriptions'
 import { Clients } from './pages/owner/Clients'
 import { Settings } from './pages/owner/Settings'
+import { Finance } from './pages/owner/Finance'
 
 import { ClientLayout } from './components/layout/ClientLayout'
 import { Book } from './pages/client/Book'
@@ -45,6 +46,7 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="agenda" element={<Agenda />} />
+        <Route path="finance" element={<Finance />} />
         <Route path="services" element={<Services />} />
         <Route path="plans" element={<Plans />} />
         <Route path="subscriptions" element={<Subscriptions />} />

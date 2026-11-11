@@ -12,6 +12,35 @@ import {
 } from '../infinitepay'
 import { notify } from '../notify'
 import { addMonths, formatBr } from '../time'
+import { businessInfo, firstName, queueWhatsapp, retentionText } from '../whatsapp'
+
+/** WhatsApp do cancelamento: aviso pro dono e confirmação pro cliente. */
+async function whatsCancel(
+  fs: Ctx['fs'],
+  sub: Record<string, unknown>,
+  subId: string,
+  texts: { owner?: string; client?: string; retention?: { validUntil?: string } },
+) {
+  const [shop, client] = await Promise.all([businessInfo(fs), fs.get(`users/${sub.clientId}`)])
+  if (texts.owner) {
+    await queueWhatsapp(fs, { phone: shop.phone, kind: 'plan_canceled_owner', relatedId: subId, text: texts.owner })
+  }
+  if (texts.retention) {
+    await queueWhatsapp(fs, {
+      phone: client?.data.phone,
+      kind: 'plan_canceled_retention',
+      relatedId: subId,
+      text: `${retentionText(sub.clientName, sub.planName, shop.retentionOffer, texts.retention.validUntil)}\n\n${shop.name}`,
+    })
+  } else if (texts.client) {
+    await queueWhatsapp(fs, {
+      phone: client?.data.phone,
+      kind: 'plan_canceled_client',
+      relatedId: subId,
+      text: `${texts.client}\n\n${shop.name}`,
+    })
+  }
+}
 
 function safeId(v: unknown, what: string) {
   const id = String(v ?? '')
@@ -164,6 +193,11 @@ export async function cancelSubscription(ctx: Ctx) {
     title: 'Assinatura cancelada',
     message: `Sua assinatura do plano "${sub.data.planName}" foi cancelada. Não haverá novas cobranças.`,
   })
+  await whatsCancel(fs, sub.data, subId, {
+    client:
+      `Olá, ${firstName(sub.data.clientName)}. Sua assinatura do plano *${sub.data.planName}* foi cancelada ` +
+      `pela barbearia. Não haverá novas cobranças.`,
+  })
   return { ok: true }
 }
 
@@ -189,6 +223,10 @@ export async function cancelMyPlan({ env, fs, uid, data }: Ctx) {
       title: 'Cliente manteve o plano',
       message: `${sub.clientName} desistiu de cancelar o plano "${sub.planName}".`,
     })
+    await whatsCancel(fs, sub, subId, {
+      owner: `✅ ${sub.clientName} desistiu de cancelar e *manteve* o plano ${sub.planName}.`,
+      client: `Que bom que você ficou, ${firstName(sub.clientName)}! 💈 Seu plano *${sub.planName}* continua normalmente.`,
+    })
     return { status: 'active' }
   }
 
@@ -205,6 +243,11 @@ export async function cancelMyPlan({ env, fs, uid, data }: Ctx) {
       title: 'Cliente cancelou o plano',
       message: `${sub.clientName} cancelou o plano "${sub.planName}". Ele continua valendo${end ? ` até ${formatBr(end)}` : ''} e não haverá novas cobranças.`,
     })
+    await whatsCancel(fs, sub, subId, {
+      owner: `❌ *Plano cancelado pelo cliente*\n\n${sub.clientName} cancelou o plano *${sub.planName}*.` +
+        (end ? ` Ele continua valendo até ${formatBr(end)}.` : ''),
+      retention: { validUntil: end ? formatBr(end) : undefined },
+    })
     return { status: 'active' }
   }
 
@@ -218,6 +261,12 @@ export async function cancelMyPlan({ env, fs, uid, data }: Ctx) {
       relatedId: subId,
       title: 'Cliente cancelou o plano',
       message: `${sub.clientName} cancelou o plano "${sub.planName}"${sub.status === 'past_due' ? ' (estava em atraso)' : ''}.`,
+    })
+    await whatsCancel(fs, sub, subId, {
+      owner:
+        `❌ *Plano cancelado pelo cliente*\n\n${sub.clientName} cancelou o plano *${sub.planName}*` +
+        (sub.status === 'past_due' ? ' (estava com mensalidade em atraso).' : '.'),
+      retention: {},
     })
     return { status: 'canceled' }
   }

@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
 import { Logo } from '../Logo'
 import { NotificationBell } from '../NotificationBell'
@@ -8,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 const NAV = [
   { to: '/owner', label: 'Painel', icon: '📊', end: true },
   { to: '/owner/agenda', label: 'Agenda', icon: '🗓️' },
+  { to: '/owner/finance', label: 'Financeiro', icon: '💰' },
   { to: '/owner/services', label: 'Serviços', icon: '✂️' },
   { to: '/owner/plans', label: 'Planos', icon: '🏷️' },
   { to: '/owner/subscriptions', label: 'Assinaturas', icon: '💳' },
@@ -15,8 +17,16 @@ const NAV = [
   { to: '/owner/settings', label: 'Configurações', icon: '⚙️' },
 ]
 
+/** No celular cabem 4 itens + "Mais"; o resto abre num painel. */
+const MOBILE_MAIN = ['/owner', '/owner/agenda', '/owner/finance', '/owner/subscriptions']
+
 export function OwnerLayout() {
   const { profile, logout } = useAuth()
+  const [moreOpen, setMoreOpen] = useState(false)
+  const location = useLocation()
+  const mainItems = NAV.filter((n) => MOBILE_MAIN.includes(n.to))
+  const moreItems = NAV.filter((n) => !MOBILE_MAIN.includes(n.to))
+  const moreActive = moreItems.some((n) => location.pathname.startsWith(n.to))
 
   return (
     <div className="min-h-screen bg-ink text-neutral-100 md:flex">
@@ -70,8 +80,46 @@ export function OwnerLayout() {
           <Outlet />
         </main>
 
+        {moreOpen && (
+          <div className="fixed inset-0 z-40 md:hidden" onClick={() => setMoreOpen(false)}>
+            <div className="absolute inset-0 bg-black/50" />
+            <div
+              className="absolute inset-x-0 bottom-0 rounded-t-xl border-t border-ink-border bg-ink-soft p-3 pb-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {moreItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={() => setMoreOpen(false)}
+                  className={({ isActive }) =>
+                    clsx(
+                      'flex items-center gap-3 rounded-md px-3 py-3 text-sm',
+                      isActive ? 'bg-ink-card text-gold-light' : 'text-neutral-300',
+                    )
+                  }
+                >
+                  <span className="text-base">{item.icon}</span>
+                  {item.label}
+                </NavLink>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setMoreOpen(false)
+                  logout()
+                }}
+                className="flex w-full items-center gap-3 rounded-md px-3 py-3 text-sm text-neutral-400"
+              >
+                <span className="text-base">🚪</span>
+                Sair
+              </button>
+            </div>
+          </div>
+        )}
+
         <nav className="fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-ink-border bg-ink-soft/95 backdrop-blur md:hidden">
-          {NAV.slice(0, 5).map((item) => (
+          {mainItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -87,6 +135,17 @@ export function OwnerLayout() {
               <span className="w-full truncate text-center">{item.label}</span>
             </NavLink>
           ))}
+          <button
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            className={clsx(
+              'flex min-w-0 flex-1 flex-col items-center gap-0.5 py-2 text-[10px]',
+              moreActive || moreOpen ? 'text-gold-light' : 'text-neutral-500',
+            )}
+          >
+            <span className="text-base">☰</span>
+            <span className="w-full truncate text-center">Mais</span>
+          </button>
         </nav>
       </div>
     </div>

@@ -59,6 +59,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---- saídas (aluguel, energia, água, itens do salão...) — só o dono ----
+    match /expenses/{expenseId} {
+      allow read, write: if isOwner();
+    }
+
     // ---- mensalidades (uma por mês, com link InfinitePay) ----
     match /invoices/{invoiceId} {
       allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid);

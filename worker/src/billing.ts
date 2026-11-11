@@ -141,7 +141,9 @@ export async function markInvoicePaid(
       transactionNsu: payment.transactionNsu,
       captureMethod: payment.captureMethod,
       receiptUrl: payment.receiptUrl ?? null,
-      description: `Mensalidade ${inv.planName}`,
+      kind: inv.kind ?? 'renewal',
+      planName: inv.kind === 'upgrade' ? inv.targetPlanName : inv.planName,
+      description: inv.kind === 'upgrade' ? `Upgrade para ${inv.targetPlanName}` : `Mensalidade ${inv.planName}`,
       paidAt: now,
       createdAt: now,
     })

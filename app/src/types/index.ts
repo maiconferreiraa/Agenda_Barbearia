@@ -127,6 +127,9 @@ export interface Payment {
   amount: number
   status: PaymentStatus
   invoiceId?: string
+  /** Plano da mensalidade (ou plano de destino, no upgrade). */
+  planName?: string
+  kind?: 'first' | 'renewal' | 'upgrade'
   transactionNsu?: string
   captureMethod?: string
   receiptUrl?: string
@@ -175,4 +178,32 @@ export interface BusinessSettings {
     'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun',
     DayHours
   >
+  /** Oferta mandada no WhatsApp para quem cancela o plano. */
+  retentionOffer?: string
 }
+
+export const EXPENSE_CATEGORIES = [
+  'Aluguel',
+  'Energia',
+  'Água',
+  'Internet e telefone',
+  'Itens do salão',
+  'Produtos',
+  'Funcionários',
+  'Impostos e taxas',
+  'Outros',
+] as const
+
+/** Saída de dinheiro. Com `recurring`, repete todo mês no mesmo dia a partir de `date`. */
+export interface Expense {
+  id: string
+  description: string
+  category: string
+  amount: number
+  date: Timestamp
+  recurring: boolean
+  /** Fim da repetição ("parar de repetir"). */
+  endedAt?: Timestamp | null
+  createdAt?: Timestamp
+}
+

@@ -78,6 +78,21 @@ export function Settings() {
         </Card>
 
         <Card className="space-y-3">
+          <h2 className="font-display text-base text-gold-light">Quando um cliente cancela o plano</h2>
+          <p className="text-sm text-neutral-400">
+            O cliente recebe no WhatsApp uma mensagem perguntando o motivo e com esta oferta para continuar. As
+            respostas chegam no WhatsApp da barbearia.
+          </p>
+          <Input
+            label="Oferta para quem cancela"
+            placeholder="Ex.: 10% de desconto na próxima mensalidade"
+            value={form.retentionOffer ?? ''}
+            onChange={(e) => setForm((f) => ({ ...f, retentionOffer: e.target.value }))}
+            hint="Deixe vazio para oferecer só 'uma condição especial', sem dizer qual."
+          />
+        </Card>
+
+        <Card className="space-y-3">
           <h2 className="font-display text-base text-gold-light">Horário de funcionamento</h2>
           {(Object.keys(form.hours) as (keyof BusinessSettings['hours'])[]).map((key) => {
             const day = form.hours[key]
