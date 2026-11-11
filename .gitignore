@@ -11,3 +11,4 @@ ui-debug.log
 graphify-out/
 .wrangler/
 .dev.vars
+.pages-dist/

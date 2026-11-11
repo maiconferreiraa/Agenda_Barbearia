@@ -5,7 +5,8 @@
   "scripts": {
     "check": "tsc --noEmit",
     "dev": "wrangler dev",
-    "deploy": "npm --prefix ../app run build && wrangler deploy"
+    "deploy": "npm --prefix ../app run build && wrangler deploy",
+    "deploy:pages": "bash publicar-pages.sh"
   },
   "dependencies": {
     "jose": "5.9.6"
