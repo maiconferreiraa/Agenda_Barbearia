@@ -16,7 +16,9 @@ interface WhatsAppState {
 const QR_STALE_MS = 3 * 60 * 1000
 
 function formatPhone(digits: string) {
-  const d = digits.replace(/^55/, '')
+  let d = digits.replace(/^55/, '')
+  // o WhatsApp às vezes devolve o celular sem o 9 (DDD + 8 dígitos começando com 6–9)
+  if (d.length === 10 && /^[6-9]$/.test(d[2])) d = `${d.slice(0, 2)}9${d.slice(2)}`
   if (d.length === 11) return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`
   if (d.length === 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`
   return digits

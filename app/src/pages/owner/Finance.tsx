@@ -112,7 +112,7 @@ export function Finance() {
           >
             ‹
           </button>
-          <span className="min-w-36 text-center text-sm capitalize text-neutral-200">{period.label}</span>
+          <span className="min-w-36 text-center text-sm text-neutral-200 first-letter:uppercase">{period.label}</span>
           <button
             type="button"
             aria-label="Próximo período"
@@ -148,11 +148,7 @@ export function Finance() {
             </Card>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Card className="col-span-2 md:col-span-1">
-              <p className="text-xs text-neutral-500">Total recebido</p>
-              <p className="mt-1 font-display text-3xl text-gold-light tabular-nums">{formatCurrency(total)}</p>
-            </Card>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
             <Card>
               <p className="flex items-center gap-1.5 text-xs text-neutral-500">
                 <span className="h-2 w-2 rounded-sm" style={{ background: SERIES.plans.color }} />
@@ -169,7 +165,7 @@ export function Finance() {
               <p className="mt-1 font-display text-xl text-neutral-100 tabular-nums">{formatCurrency(report.walkInTotal)}</p>
               <p className="text-xs text-neutral-500">{report.walkInCount} atendimento(s)</p>
             </Card>
-            <Card>
+            <Card className="col-span-2 md:col-span-1">
               <p className="text-xs text-neutral-500">Serviços pelo plano</p>
               <p className="mt-1 font-display text-xl text-neutral-100 tabular-nums">{report.creditUses}</p>
               <p className="text-xs text-neutral-500">já pagos na mensalidade</p>

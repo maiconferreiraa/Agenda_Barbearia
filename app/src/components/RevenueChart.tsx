@@ -19,8 +19,9 @@ function niceMax(v: number) {
   return step * exp
 }
 
-function compactBRL(v: number) {
+function compactBRL(v: number, max: number) {
   if (v >= 1000) return `R$ ${(v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil`
+  if (max < 20) return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   return `R$ ${Math.round(v)}`
 }
 
@@ -106,7 +107,7 @@ export function RevenueChart({ buckets }: { buckets: Bucket[] }) {
               <g key={t}>
                 <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} stroke="#2a2a2e" strokeWidth={1} />
                 <text x={PAD.left - 6} y={y(t) + 3} textAnchor="end" fontSize={10} fill="#8a8a90">
-                  {compactBRL(t)}
+                  {compactBRL(t, max)}
                 </text>
               </g>
             ))}

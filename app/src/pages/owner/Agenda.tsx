@@ -92,22 +92,22 @@ export function Agenda() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-neutral-100">Agenda</h1>
         <div className="flex items-center gap-2">
-          <Button variant="secondary" onClick={() => setDay(addDays(day, -1))}>
-            ← Anterior
+          <Button variant="secondary" aria-label="Dia anterior" onClick={() => setDay(addDays(day, -1))} className="!px-3 !py-1.5">
+            ‹
           </Button>
-          <Button variant="secondary" onClick={() => setDay(startOfDay(new Date()))}>
+          <Button variant="secondary" onClick={() => setDay(startOfDay(new Date()))} className="!px-3 !py-1.5 text-sm">
             Hoje
           </Button>
-          <Button variant="secondary" onClick={() => setDay(addDays(day, 1))}>
-            Próximo →
+          <Button variant="secondary" aria-label="Próximo dia" onClick={() => setDay(addDays(day, 1))} className="!px-3 !py-1.5">
+            ›
           </Button>
         </div>
       </div>
 
-      <p className="text-sm text-neutral-400 capitalize">
+      <p className="text-sm text-neutral-400 first-letter:uppercase">
         {day.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
       </p>
 

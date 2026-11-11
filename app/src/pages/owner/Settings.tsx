@@ -10,6 +10,16 @@ import { WhatsAppCard } from '../../components/WhatsAppCard'
 import { WEEKDAY_LABELS } from '../../lib/schedule'
 import type { BusinessSettings, DayHours } from '../../types'
 
+/** Horários em 24 h de 30 em 30 min (mantém um valor salvo fora dessa grade). */
+function timeOptions(current: string) {
+  const list: string[] = []
+  for (let m = 5 * 60; m <= 23 * 60 + 30; m += 30) {
+    list.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`)
+  }
+  if (current && !list.includes(current)) list.push(current)
+  return list.sort()
+}
+
 export function Settings() {
   const { settings, loading } = useBusinessSettings()
   const [form, setForm] = useState<BusinessSettings>(settings)
@@ -94,11 +104,12 @@ export function Settings() {
 
         <Card className="space-y-3">
           <h2 className="font-display text-base text-gold-light">Horário de funcionamento</h2>
-          {(Object.keys(form.hours) as (keyof BusinessSettings['hours'])[]).map((key) => {
+          {(Object.keys(WEEKDAY_LABELS) as (keyof BusinessSettings['hours'])[]).map((key) => {
             const day = form.hours[key]
+            if (!day) return null
             return (
-              <div key={key} className="flex items-center gap-3">
-                <label className="flex w-28 items-center gap-2 text-sm text-neutral-300">
+              <div key={key} className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                <label className="flex items-center gap-2 text-sm text-neutral-300">
                   <input
                     type="checkbox"
                     checked={day.enabled}
@@ -106,21 +117,31 @@ export function Settings() {
                   />
                   {WEEKDAY_LABELS[key]}
                 </label>
-                <input
-                  type="time"
+                <select
                   value={day.open}
                   disabled={!day.enabled}
                   onChange={(e) => updateDay(key, { open: e.target.value })}
-                  className="rounded-md border border-ink-border bg-ink-soft px-2 py-1.5 text-sm text-neutral-100 disabled:opacity-40"
-                />
+                  className="w-full min-w-0 rounded-md border border-ink-border bg-ink-soft px-1.5 py-1.5 text-sm text-neutral-100 disabled:opacity-40"
+                >
+                  {timeOptions(day.open).map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
                 <span className="text-neutral-500">até</span>
-                <input
-                  type="time"
+                <select
                   value={day.close}
                   disabled={!day.enabled}
                   onChange={(e) => updateDay(key, { close: e.target.value })}
-                  className="rounded-md border border-ink-border bg-ink-soft px-2 py-1.5 text-sm text-neutral-100 disabled:opacity-40"
-                />
+                  className="w-full min-w-0 rounded-md border border-ink-border bg-ink-soft px-1.5 py-1.5 text-sm text-neutral-100 disabled:opacity-40"
+                >
+                  {timeOptions(day.close).map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
               </div>
             )
           })}
