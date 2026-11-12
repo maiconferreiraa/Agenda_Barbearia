@@ -105,6 +105,25 @@ export async function conectar() {
  * Envia texto para um número 55DDDNÚMERO.
  * Devolve 'ok' | 'sem_whatsapp' | 'desconectado'.
  */
+/** Pasta dos arquivos que a ponte pode mandar (manual em PDF etc.). Nada fora dela sai. */
+export const PASTA_ARQUIVOS = path.join(os.homedir(), '.config', 'barbearia-prime', 'arquivos')
+
+/** Manda um arquivo (ex.: PDF) com legenda. `arquivo` = nome dentro de PASTA_ARQUIVOS. */
+export async function enviarArquivo(numero, arquivo, legenda, mimetype = 'application/pdf') {
+  if (!estaConectado()) return 'desconectado'
+  const caminho = path.join(PASTA_ARQUIVOS, path.basename(String(arquivo)))
+  if (!fs.existsSync(caminho)) return 'arquivo não encontrado'
+  const [info] = await sock.onWhatsApp(numero)
+  if (!info?.exists) return 'sem_whatsapp'
+  await sock.sendMessage(info.jid, {
+    document: fs.readFileSync(caminho),
+    fileName: path.basename(caminho),
+    mimetype,
+    caption: legenda || undefined,
+  })
+  return 'ok'
+}
+
 export async function enviarTexto(numero, texto) {
   if (!estaConectado()) return 'desconectado'
   const [info] = await sock.onWhatsApp(numero)

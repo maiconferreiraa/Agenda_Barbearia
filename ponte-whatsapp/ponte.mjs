@@ -25,7 +25,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { initializeApp, cert } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
-import { conectar, desconectar, enviarTexto, estaConectado, estaDeslogado, pedirCodigo, quandoMudar } from './whatsapp.mjs'
+import { conectar, desconectar, enviarArquivo, enviarTexto, estaConectado, estaDeslogado, pedirCodigo, quandoMudar } from './whatsapp.mjs'
 
 const PASTA = path.join(os.homedir(), '.config', 'barbearia-prime')
 const CONFIG_PATH = path.join(PASTA, 'ponte.json')
@@ -143,7 +143,9 @@ async function processarFila() {
 
     let resultado
     try {
-      resultado = await enviarTexto(msg.to, msg.text)
+      resultado = msg.document
+        ? await enviarArquivo(msg.to, msg.document.file, msg.text, msg.document.mimetype)
+        : await enviarTexto(msg.to, msg.text)
     } catch (err) {
       resultado = `erro: ${err.message}`
     }

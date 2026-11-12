@@ -12,3 +12,7 @@ graphify-out/
 .wrangler/
 .dev.vars
 .pages-dist/
+
+# Manual do dono: o PDF e as fotos mostram telefones e dados reais (repositório público)
+manual/prints/
+manual/*.pdf
