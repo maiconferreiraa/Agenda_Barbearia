@@ -35,10 +35,13 @@ const BARBER_NAV: NavItem[] = [
   { to: '/barber', label: 'Minha agenda', icon: '🗓️', end: true },
   { to: '/barber/clients', label: 'Meus clientes', icon: '👥' },
   { to: '/barber/production', label: 'Minha produção', icon: '💰' },
+  { to: '/barber/schedule', label: 'Meus horários', icon: '⏰' },
+  { to: '/barber/plans', label: 'Planos', icon: '🏷️' },
 ]
+const BARBER_MAIN = ['/barber', '/barber/clients', '/barber/production', '/barber/schedule']
 
 export function BarberLayout() {
-  return <OwnerLayout nav={BARBER_NAV} mobileMain={BARBER_NAV.map((n) => n.to)} />
+  return <OwnerLayout nav={BARBER_NAV} mobileMain={BARBER_MAIN} />
 }
 
 export function OwnerLayout({ nav = NAV, mobileMain = MOBILE_MAIN }: { nav?: NavItem[]; mobileMain?: string[] } = {}) {

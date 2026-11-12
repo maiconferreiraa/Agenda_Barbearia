@@ -32,7 +32,7 @@ import { runHolidayNotices } from './holidays'
 import { runAutoComplete } from './autoComplete'
 import { runMarketing } from './marketing'
 import { confirmLinkCode, requestLinkCode } from './api/linkAccount'
-import { createCollaborator, setCollaboratorPassword, updateTeamMember } from './api/team'
+import { createCollaborator, setCollaboratorPassword, setWorkSchedule, updateTeamMember } from './api/team'
 
 /** Endpoints chamados pelo app: POST /api/<nome>, com o token de login. */
 const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
@@ -59,6 +59,7 @@ const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
   createCollaborator,
   updateTeamMember,
   setCollaboratorPassword,
+  setWorkSchedule,
 }
 
 const PUBLIC_ROUTES: Record<string, (env: Env, fs: Firestore, data: Record<string, unknown>) => Promise<unknown>> = {

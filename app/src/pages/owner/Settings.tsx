@@ -257,6 +257,10 @@ export function Settings() {
 
         <Card className="space-y-3">
           <h2 className="font-display text-base text-gold-light">Horário de funcionamento</h2>
+          <p className="text-xs text-neutral-500">
+            Vale para quem não tem horário próprio. Cada barbeiro pode ter dias, horário e almoço dele em Equipe → Dias e
+            horários.
+          </p>
           {(Object.keys(WEEKDAY_LABELS) as (keyof BusinessSettings['hours'])[]).map((key) => {
             const day = form.hours[key]
             if (!day) return null

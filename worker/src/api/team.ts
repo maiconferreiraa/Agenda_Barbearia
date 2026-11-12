@@ -2,7 +2,7 @@ import { ApiError } from '../env'
 import { gfetch, googleToken } from '../google'
 import { PHONE_RULE, strictPhoneBr } from '../whatsapp'
 import type { Ctx } from './ctx'
-import { requireOwner } from './ctx'
+import { requireOwner, requireStaff } from './ctx'
 import { normalizeUsername } from './username'
 
 /**
@@ -104,5 +104,45 @@ export async function setCollaboratorPassword(ctx: Ctx) {
     body: JSON.stringify({ localId: id, password }),
   })
   if (!res.ok) throw new ApiError('internal', 'Não foi possível trocar a senha agora.')
+  return { ok: true }
+}
+
+const WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/
+const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3))
+
+/**
+ * POST /api/setWorkSchedule { id, schedule } — dias, horários e almoço de quem atende.
+ * O colaborador muda o dele; o dono muda o de qualquer um (inclusive o próprio).
+ * `schedule: null` volta a usar o horário da barbearia.
+ */
+export async function setWorkSchedule(ctx: Ctx) {
+  const { fs, data, uid } = ctx
+  const { isOwner } = await requireStaff(ctx)
+  const id = safeId(data.id)
+  if (!isOwner && id !== uid) throw new ApiError('permission-denied', 'Você só pode mudar o seu horário.')
+  const member = await fs.get(`users/${id}`)
+  if (!member || !['owner', 'barber'].includes(String(member.data.role))) throw new ApiError('not-found', 'Colaborador não encontrado.')
+  if (data.schedule === null) {
+    await fs.update(member.path, { schedule: null })
+    return { ok: true }
+  }
+  const raw = data.schedule as { hours?: Record<string, { enabled?: unknown; open?: unknown; close?: unknown }>; lunch?: { enabled?: unknown; start?: unknown; end?: unknown } }
+  if (!raw || typeof raw !== 'object' || !raw.hours) throw new ApiError('invalid-argument', 'Horário inválido.')
+  const hours: Record<string, { enabled: boolean; open: string; close: string }> = {}
+  for (const k of WEEK) {
+    const d = raw.hours[k] ?? {}
+    const open = String(d.open ?? '09:00')
+    const close = String(d.close ?? '19:00')
+    if (!HHMM.test(open) || !HHMM.test(close)) throw new ApiError('invalid-argument', 'Horário inválido.')
+    const enabled = d.enabled === true
+    if (enabled && mins(close) <= mins(open)) throw new ApiError('invalid-argument', 'A saída precisa ser depois da entrada.')
+    hours[k] = { enabled, open, close }
+  }
+  const l = raw.lunch ?? {}
+  const lunch = { enabled: l.enabled === true, start: String(l.start ?? '12:00'), end: String(l.end ?? '13:00') }
+  if (!HHMM.test(lunch.start) || !HHMM.test(lunch.end)) throw new ApiError('invalid-argument', 'Horário de almoço inválido.')
+  if (lunch.enabled && mins(lunch.end) <= mins(lunch.start)) throw new ApiError('invalid-argument', 'O fim do almoço precisa ser depois do início.')
+  await fs.update(member.path, { schedule: { hours, lunch } })
   return { ok: true }
 }

@@ -8,6 +8,9 @@ import { useBarberAppointments } from '../../hooks/useAppointments'
 import { formatCurrency } from '../../lib/format'
 import { periodFor, type PeriodKind } from '../../lib/finance'
 import { productionByBarber } from '../../lib/production'
+import { Button } from '../../components/ui/Button'
+import { useBusinessSettings } from '../../hooks/useBusinessSettings'
+import { exportBarberCsv, exportBarberPdf } from '../../lib/financeExport'
 
 /** Colaborador: o que ele produziu no período e a comissão dele. */
 export function BarberProduction() {
@@ -16,6 +19,8 @@ export function BarberProduction() {
   const [offset, setOffset] = useState(0)
   const period = useMemo(() => periodFor(kind, new Date(), offset), [kind, offset])
   const { data: appts, loading } = useBarberAppointments(profile?.uid)
+  const { settings } = useBusinessSettings()
+  const [exporting, setExporting] = useState(false)
   const [row] = profile ? productionByBarber(appts, [profile], period.start, period.end) : []
   const done = appts
     .filter((a) => a.status === 'done' && a.date.toDate() >= period.start && a.date.toDate() <= period.end)
@@ -25,6 +30,30 @@ export function BarberProduction() {
     <div className="max-w-3xl space-y-4">
       <h1 className="font-display text-2xl text-neutral-100">Minha produção</h1>
       <PeriodPicker kind={kind} offset={offset} period={period} onKind={setKind} onOffset={setOffset} />
+      {row && (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="secondary"
+            loading={exporting}
+            onClick={async () => {
+              setExporting(true)
+              try {
+                await exportBarberPdf(settings.name, period, row)
+              } catch (err) {
+                alert('Não foi possível gerar o PDF. ' + (err as Error).message)
+              } finally {
+                setExporting(false)
+              }
+            }}
+            className="!px-3 !py-1.5 text-xs"
+          >
+            ⬇ Baixar meu relatório (PDF)
+          </Button>
+          <Button variant="secondary" onClick={() => exportBarberCsv(settings.name, period, row)} className="!px-3 !py-1.5 text-xs">
+            ⬇ CSV (Excel)
+          </Button>
+        </div>
+      )}
       {loading && <Spinner full />}
       {row && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -64,14 +93,19 @@ export function BarberProduction() {
                   {a.date.toDate().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} · {a.clientName} ·{' '}
                   {a.serviceName}
                 </span>
-                <span className="tabular-nums text-neutral-400">{a.usedPlanCredit && a.price === 0 ? 'plano' : formatCurrency(a.price)}</span>
+                <span className="tabular-nums text-neutral-400">
+                  {a.usedPlanCredit && a.price === 0
+                    ? 'plano'
+                    : `${formatCurrency(a.price)}${a.paymentMethod ? ` · ${{ pix: 'Pix', dinheiro: 'Dinheiro', cartao: 'Cartão' }[a.paymentMethod]}` : ''}`}
+                </span>
               </li>
             ))}
           </ul>
         )}
       </Card>
       <p className="text-xs text-neutral-500">
-        Só contam os horários marcados como <b>Concluído</b>. Serviço feito pelo plano entra na produção pelo preço de tabela.
+        Só contam os horários marcados como <b>Concluído</b>. A comissão vale sobre tudo: Pix, dinheiro, cartão e o
+        serviço feito pelo plano (pelo preço de tabela).
       </p>
     </div>
   )

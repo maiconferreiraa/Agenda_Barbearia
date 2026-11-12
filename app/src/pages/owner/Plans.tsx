@@ -20,8 +20,10 @@ import { usePlans } from '../../hooks/usePlans'
 import { formatCurrency } from '../../lib/format'
 import type { Plan, PlanIncludedService } from '../../types'
 
-export function Plans() {
-  const { data: plans, loading } = usePlans()
+/** `readOnly`: barbeiro vê os planos, mas só o dono cria, edita ou remove. */
+export function Plans({ readOnly = false }: { readOnly?: boolean } = {}) {
+  const { data: allPlans, loading } = usePlans()
+  const plans = readOnly ? allPlans.filter((p) => p.active) : allPlans
   const { data: services } = useServices({ onlyActive: true })
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Plan | null>(null)
@@ -94,18 +96,18 @@ export function Plans() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="font-display text-2xl text-neutral-100">Planos mensais</h1>
-        <Button onClick={openNew}>+ Novo plano</Button>
+        {!readOnly && <Button onClick={openNew}>+ Novo plano</Button>}
       </div>
 
       {loading && <Spinner full />}
 
       {!loading && plans.length === 0 && (
         <Card className="text-center text-sm text-neutral-400">
-          Nenhum plano cadastrado ainda. Crie um plano, por exemplo "4 cortes por mês".
+          {readOnly ? 'Nenhum plano cadastrado.' : 'Nenhum plano cadastrado ainda. Crie um plano, por exemplo "4 cortes por mês".'}
         </Card>
       )}
 
-      {!loading && services.length === 0 && (
+      {!readOnly && !loading && services.length === 0 && (
         <Card className="text-sm text-amber-400">
           Cadastre serviços primeiro em <b>Serviços</b> para poder incluí-los em um plano.
         </Card>
@@ -132,14 +134,14 @@ export function Plans() {
                 </li>
               ))}
             </ul>
-            <div className="mt-3 flex gap-2">
+            {!readOnly && <div className="mt-3 flex gap-2">
               <Button variant="secondary" onClick={() => openEdit(p)} className="!px-3 !py-1.5 text-xs">
                 Editar
               </Button>
               <Button variant="danger" onClick={() => handleDelete(p.id)} className="!px-3 !py-1.5 text-xs">
                 Remover
               </Button>
-            </div>
+            </div>}
           </Card>
         ))}
       </div>

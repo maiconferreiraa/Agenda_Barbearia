@@ -1,4 +1,5 @@
 import type { FinanceReport, Period } from './finance'
+import type { BarberProduction } from './production'
 import logoUrl from '../assets/logo.jpg'
 
 /** Carrega a logo como data URL para o jsPDF. */
@@ -43,7 +44,7 @@ function csvCell(v: string | number) {
   return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-export function exportCsv(shop: string, p: Period, r: FinanceReport) {
+export function exportCsv(shop: string, p: Period, r: FinanceReport, team: BarberProduction[] = []) {
   const lines: (string | number)[][] = []
   const total = r.plansTotal + r.walkInTotal
   lines.push([`Relatório financeiro - ${shop}`], [`Período: ${p.label}`], [])
@@ -81,6 +82,15 @@ export function exportCsv(shop: string, p: Period, r: FinanceReport) {
   lines.push(['CANCELAMENTOS'], ['Data', 'Cliente', 'Serviço', 'Cancelou', 'Tipo', 'Valor'])
   for (const d of r.canceledDetails) lines.push([dateBr(d.date), d.client, d.item, d.canceledBy, d.method, d.amount])
 
+  if (team.length > 0) {
+    lines.push([])
+    lines.push(['EQUIPE - PRODUÇÃO E COMISSÃO'], ['Barbeiro', 'Atendimentos', 'Pix', 'Dinheiro', 'Cartão', 'Sem forma', 'Pelo plano', 'Produção', 'Comissão %', 'Comissão'])
+    for (const t of team) {
+      lines.push([t.name, String(t.count), t.byMethod.pix, t.byMethod.dinheiro, t.byMethod.cartao, t.byMethod.semForma, t.planValue, t.produced, String(t.commissionPercent), t.commission])
+    }
+    lines.push(['Total de comissões', '', '', '', '', '', '', '', '', team.reduce((x, t) => x + t.commission, 0)])
+  }
+
   const csv = lines.map((l) => l.map(csvCell).join(';')).join('\r\n')
   // BOM: faz o Excel reconhecer acentos (UTF-8)
   download(`${fileBase(p)}.csv`, new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }))
@@ -88,7 +98,7 @@ export function exportCsv(shop: string, p: Period, r: FinanceReport) {
 
 // ---------- PDF ----------
 
-export async function exportPdf(shop: string, p: Period, r: FinanceReport) {
+export async function exportPdf(shop: string, p: Period, r: FinanceReport, team: BarberProduction[] = []) {
   // Carrega a biblioteca só quando o dono pede o PDF (não pesa o app).
   const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
   const doc = new jsPDF({ unit: 'pt', format: 'a4' })
@@ -195,5 +205,106 @@ export async function exportPdf(shop: string, p: Period, r: FinanceReport) {
     [4],
   )
 
+  table(
+    `Equipe — produção e comissão (total a pagar ${brl(team.reduce((x, t) => x + t.commission, 0))})`,
+    ['Barbeiro', 'Atend.', 'Pix', 'Dinheiro', 'Cartão', 'Plano', 'Produção', 'Comissão'],
+    team.map((t) => [
+      t.name,
+      String(t.count),
+      brl(t.byMethod.pix),
+      brl(t.byMethod.dinheiro),
+      brl(t.byMethod.cartao + t.byMethod.semForma),
+      brl(t.planValue),
+      brl(t.produced),
+      t.commissionPercent > 0 ? `${brl(t.commission)} (${t.commissionPercent}%)` : '—',
+    ]),
+    [1, 2, 3, 4, 5, 6, 7],
+  )
+
   doc.save(`${fileBase(p)}.pdf`)
+}
+
+// ---------- Relatório individual do barbeiro ----------
+
+const slug = (t: string) =>
+  t
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+
+function barberFile(p: Period, b: BarberProduction) {
+  return fileBase(p).replace('relatorio-financeiro', `producao-${slug(b.name) || 'barbeiro'}`)
+}
+
+/** Resumo e atendimentos de um barbeiro: produção por forma de pagamento e comissão. */
+function barberSummary(b: BarberProduction): [string, string][] {
+  const rows: [string, string][] = [
+    ['Atendimentos concluídos', String(b.count)],
+    ['Pix', brl(b.byMethod.pix)],
+    ['Dinheiro', brl(b.byMethod.dinheiro)],
+    ['Cartão', brl(b.byMethod.cartao)],
+  ]
+  if (b.byMethod.semForma > 0) rows.push(['Avulso sem forma lançada', brl(b.byMethod.semForma)])
+  rows.push(
+    [`Pelo plano (${b.planServices} serviço(s), preço de tabela)`, brl(b.planValue)],
+    ['Produção total', brl(b.produced)],
+    [`Comissão (${b.commissionPercent}%)`, brl(b.commission)],
+  )
+  return rows
+}
+
+export function exportBarberCsv(shop: string, p: Period, b: BarberProduction) {
+  const lines: (string | number)[][] = [[`Produção e comissão - ${b.name} - ${shop}`], [`Período: ${p.label}`], []]
+  lines.push(['RESUMO'], ...barberSummary(b), [])
+  lines.push(['ATENDIMENTOS'], ['Data', 'Cliente', 'Serviço', 'Forma', 'Valor', 'Comissão'])
+  for (const d of b.details) lines.push([dateBr(d.date), d.client, d.service, d.method, d.value, d.commission])
+  const csv = lines.map((l) => l.map(csvCell).join(';')).join('\r\n')
+  download(`${barberFile(p, b)}.csv`, new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' }))
+}
+
+export async function exportBarberPdf(shop: string, p: Period, b: BarberProduction) {
+  const [{ jsPDF }, { default: autoTable }] = await Promise.all([import('jspdf'), import('jspdf-autotable')])
+  const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+  const left = 40
+  const head = { fillColor: [26, 26, 29] as [number, number, number], textColor: 255 }
+  let y = 48
+  try {
+    const logo = await loadImage(logoUrl)
+    doc.addImage(logo, 'JPEG', left, 28, 150, 72)
+    y = 124
+  } catch {
+    /* sem logo */
+  }
+  doc.setFontSize(16)
+  doc.text(`Produção e comissão — ${b.name}`, left, y)
+  doc.setFontSize(10)
+  doc.setTextColor(110)
+  y += 16
+  doc.text(`${shop} · Período: ${p.label} · gerado em ${new Date().toLocaleString('pt-BR')}`, left, y)
+  doc.setTextColor(0)
+
+  autoTable(doc, {
+    startY: y + 14,
+    theme: 'grid',
+    headStyles: head,
+    head: [['Resumo', 'Valor']],
+    body: barberSummary(b),
+    columnStyles: { 1: { halign: 'right' } },
+  })
+  const at = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 22
+  doc.setFontSize(11)
+  doc.text('Atendimentos', left, at)
+  autoTable(doc, {
+    startY: at + 6,
+    theme: 'striped',
+    headStyles: head,
+    head: [['Data', 'Cliente', 'Serviço', 'Forma', 'Valor', 'Comissão']],
+    body: b.details.length
+      ? b.details.map((d) => [dateBr(d.date), d.client, d.service, d.method, brl(d.value), brl(d.commission)])
+      : [['—', 'Nenhum atendimento concluído no período', '', '', '', '']],
+    columnStyles: { 4: { halign: 'right' }, 5: { halign: 'right' } },
+  })
+  doc.save(`${barberFile(p, b)}.pdf`)
 }

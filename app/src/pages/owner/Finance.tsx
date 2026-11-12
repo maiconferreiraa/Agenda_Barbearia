@@ -10,7 +10,7 @@ import { useExpenses } from '../../hooks/useExpenses'
 import { ExpensesCard } from '../../components/ExpensesCard'
 import { buildReport, periodFor, type PeriodKind, type Row } from '../../lib/finance'
 import { formatCurrency } from '../../lib/format'
-import { exportCsv, exportPdf } from '../../lib/financeExport'
+import { exportBarberPdf, exportCsv, exportPdf } from '../../lib/financeExport'
 import { useFeeSettings } from '../../hooks/useFeeSettings'
 import { useBarbers } from '../../hooks/useTeam'
 import { productionByBarber } from '../../lib/production'
@@ -85,7 +85,7 @@ export function Finance() {
   async function handlePdf() {
     setExporting(true)
     try {
-      await exportPdf(settings.name, period, report)
+      await exportPdf(settings.name, period, report, production)
     } catch (err) {
       alert('Não foi possível gerar o PDF. ' + (err as Error).message)
     } finally {
@@ -198,7 +198,7 @@ export function Finance() {
             </Button>
             <Button
               variant="secondary"
-              onClick={() => exportCsv(settings.name, period, report)}
+              onClick={() => exportCsv(settings.name, period, report, production)}
               className="!px-3 !py-1.5 text-xs"
             >
               ⬇ Baixar CSV (Excel)
@@ -250,10 +250,14 @@ export function Finance() {
                     <p className="text-xs text-neutral-500">Comissões a pagar no período: <b>{formatCurrency(commissionTotal)}</b></p>
                   )}
                 </div>
-                <ProductionTable rows={production} />
+                <ProductionTable
+                  rows={production}
+                  onReport={(r) => exportBarberPdf(settings.name, period, r).catch((err) => alert('Não foi possível gerar o PDF. ' + (err as Error).message))}
+                />
                 <p className="mt-2 text-xs text-neutral-500">
-                  Produção = avulsos + serviços feitos pelo plano (pelo preço de tabela). Comissão = % de cada um sobre a produção.
-                  Lance o pagamento das comissões em Saídas.
+                  Produção = tudo que cada um atendeu: Pix, dinheiro, cartão e os serviços feitos pelo plano (pelo preço de
+                  tabela). Comissão = % de cada um sobre a produção. "⬇ PDF" gera o relatório de cada barbeiro, atendimento por
+                  atendimento. Lance o pagamento das comissões em Saídas.
                 </p>
               </Card>
             )}

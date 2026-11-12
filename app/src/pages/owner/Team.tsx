@@ -11,6 +11,7 @@ import { useTeam } from '../../hooks/useTeam'
 import { USERNAME_RULE, suggestUsername } from '../../lib/bookingApi'
 import { isValidPhone } from '../../lib/phone'
 import { createCollaboratorFn, setCollaboratorPasswordFn, updateTeamMemberFn } from '../../lib/paymentsApi'
+import { WorkScheduleEditor } from '../../components/WorkScheduleEditor'
 import type { UserProfile } from '../../types'
 
 /**
@@ -22,6 +23,7 @@ export function Team() {
   const { data: team, loading } = useTeam()
   const [adding, setAdding] = useState(false)
   const [pwFor, setPwFor] = useState<UserProfile | null>(null)
+  const [hoursFor, setHoursFor] = useState<UserProfile | null>(null)
   const owners = team.filter((u) => u.role === 'owner')
   const barbers = team.filter((u) => u.role === 'barber').sort((a, b) => Number(b.active !== false) - Number(a.active !== false))
 
@@ -44,7 +46,8 @@ export function Team() {
       <Card className="text-sm text-neutral-400">
         Cada colaborador entra com o <b>usuário e a senha</b> dele e vê <b>só a agenda, os clientes e a produção dele</b>.
         Você vê tudo: a agenda de cada um, e em <b>Financeiro → Equipe</b> quanto cada um produziu e a comissão a pagar.
-        Na hora de marcar, o cliente escolhe o barbeiro (ou "sem preferência").
+        Na hora de marcar, o cliente escolhe o barbeiro (ou "sem preferência"). Cada um pode ter dias, horário, almoço,
+        folgas e feriados próprios (botão <b>Dias e horários</b>; o colaborador também muda o dele em "Meus horários").
       </Card>
 
       {loading && <Spinner full />}
@@ -62,6 +65,15 @@ export function Team() {
                 <input type="checkbox" checked={!!o.attends} onChange={(e) => update(o.uid, { attends: e.target.checked })} />
               </label>
             ))}
+          {owners.some((o) => o.uid === profile.uid && o.attends) && (
+            <Button
+              variant="secondary"
+              onClick={() => setHoursFor(owners.find((o) => o.uid === profile.uid) ?? null)}
+              className="!px-2.5 !py-1.5 text-xs"
+            >
+              ⏰ Meus dias e horários
+            </Button>
+          )}
           <p className="text-xs text-neutral-500">
             Desligado: você só administra. Se nenhum barbeiro estiver cadastrado, a agenda funciona como uma só.
           </p>
@@ -98,6 +110,9 @@ export function Team() {
               </label>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setHoursFor(b)} className="!px-2.5 !py-1.5 text-xs">
+                ⏰ Dias e horários
+              </Button>
               <Button variant="secondary" onClick={() => setPwFor(b)} className="!px-2.5 !py-1.5 text-xs">
                 Trocar senha
               </Button>
@@ -124,6 +139,9 @@ export function Team() {
 
       <AddCollaborator open={adding} onClose={() => setAdding(false)} />
       <ChangePassword member={pwFor} onClose={() => setPwFor(null)} />
+      <Modal open={!!hoursFor} onClose={() => setHoursFor(null)} title={`Dias e horários — ${hoursFor?.name ?? ''}`}>
+        {hoursFor && <WorkScheduleEditor member={team.find((u) => u.uid === hoursFor.uid) ?? hoursFor} self={hoursFor.uid === profile?.uid} />}
+      </Modal>
     </div>
   )
 }

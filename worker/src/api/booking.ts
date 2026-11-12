@@ -106,14 +106,34 @@ async function loadServices(fs: Firestore, serviceIds: unknown) {
 export interface Barber {
   id: string
   name: string
+  /** Dias/horários e almoço próprios (sem = os da barbearia). */
+  schedule?: Data | null
 }
 export async function listBarbers(fs: Firestore): Promise<Barber[]> {
   const docs = await fs.query('users', { where: [{ field: 'attends', op: '==', value: true }], limit: 50 })
   return docs
     .filter((d) => (d.data.role === 'owner' || d.data.role === 'barber') && d.data.active !== false)
-    .map((d) => ({ id: d.id, name: String(d.data.name ?? '').trim() || 'Barbeiro', owner: d.data.role === 'owner' }))
+    .map((d) => ({
+      id: d.id,
+      name: String(d.data.name ?? '').trim() || 'Barbeiro',
+      owner: d.data.role === 'owner',
+      schedule: (d.data.schedule as Data | null | undefined) ?? null,
+    }))
     .sort((a, b) => Number(b.owner) - Number(a.owner) || a.name.localeCompare(b.name, 'pt-BR'))
-    .map(({ id, name }) => ({ id, name }))
+    .map(({ id, name, schedule }) => ({ id, name, schedule }))
+}
+
+/** Horário que vale para o barbeiro: o dele, se configurou; senão o da barbearia. */
+function scheduleFor(settings: Data, barber?: Barber | null): Data {
+  const own = barber?.schedule as { hours?: Data; lunch?: Data } | null | undefined
+  if (!own?.hours) return settings
+  return { ...settings, hours: own.hours, lunch: own.lunch ?? { enabled: false, start: '12:00', end: '13:00' } }
+}
+
+/** Dentro do horário de trabalho do dia (abertura–fechamento)? */
+function withinHours(settings: Data, date: Date, start: number, end: number) {
+  const hours = (settings.hours as Record<string, DayHours> | undefined)?.[WEEKDAY_KEYS[sp(date).weekday]]
+  return !!hours?.enabled && start >= toMinutes(hours.open) && end <= toMinutes(hours.close)
 }
 
 /** Horários/bloqueios do dia que ocupam a agenda de um barbeiro. Sem barberId = da agenda do 1º barbeiro (antigos) / bloqueio da barbearia toda. */
@@ -166,8 +186,9 @@ export async function getAvailableSlots({ fs, data }: Ctx) {
   if (pool.length === 0) throw new ApiError('not-found', 'Esse barbeiro não está atendendo.')
   const all = new Set<number>()
   for (const b of pool) {
-    const busy = [...busyFor(b.id, barbers[0].id, appts, blockDocs), ...lunchRange(settings)]
-    for (const s of freeStarts(day, duration, settings, busy)) all.add(s)
+    const own = scheduleFor(settings, b)
+    const busy = [...busyFor(b.id, barbers[0].id, appts, blockDocs), ...lunchRange(own)]
+    for (const s of freeStarts(day, duration, own, busy)) all.add(s)
   }
   return { slots: [...all].sort((a, b) => a - b).map(toIso) }
 }
@@ -207,20 +228,30 @@ async function createAppointment(fs: Firestore, input: BookInput) {
     const start = sp(date).minutes
     const end = start + totalDuration
     const hits = (r: Range[]) => r.some((b) => start < b.end && end > b.start)
-    if (hits(lunchRange(settings))) {
-      throw new ApiError('failed-precondition', 'Esse horário está bloqueado na agenda (almoço ou bloqueio). Escolha outro.')
-    }
+    // cliente só marca dentro do horário de quem atende; a equipe pode encaixar fora dele
+    const fromClient = input.bookedBy === 'client' || input.bookedBy === 'guest'
     let barber: Barber | null = null
     if (barbers.length === 0) {
+      if (hits(lunchRange(settings))) {
+        throw new ApiError('failed-precondition', 'Esse horário está bloqueado na agenda (almoço ou bloqueio). Escolha outro.')
+      }
       if (hits(busyRanges(dayDocs))) throw new ApiError('already-exists', 'Esse horário acabou de ser ocupado. Escolha outro.')
       if (hits(busyRanges(blockDocs))) {
         throw new ApiError('failed-precondition', 'Esse horário está bloqueado na agenda (almoço ou bloqueio). Escolha outro.')
       }
     } else {
-      const pool = wanted ? barbers.filter((b) => b.id === wanted) : barbers
-      const free = pool.filter((b) => !hits(busyFor(b.id, barbers[0].id, dayDocs, blockDocs)))
+      const pool = (wanted ? barbers.filter((b) => b.id === wanted) : barbers).filter(
+        (b) => !fromClient || withinHours(scheduleFor(settings, b), date, start, end),
+      )
+      if (pool.length === 0) {
+        throw new ApiError('failed-precondition', 'Esse horário está fora do expediente. Escolha outro.')
+      }
+      const blockedFor = (b: Barber) =>
+        hits(lunchRange(scheduleFor(settings, b))) ||
+        hits(busyRanges(blockDocs.filter((x) => !x.data.barberId || x.data.barberId === b.id)))
+      const free = pool.filter((b) => !blockedFor(b) && !hits(busyFor(b.id, barbers[0].id, dayDocs, blockDocs)))
       if (free.length === 0) {
-        const blocked = pool.every((b) => hits(busyRanges(blockDocs.filter((x) => !x.data.barberId || x.data.barberId === b.id))))
+        const blocked = pool.every(blockedFor)
         throw blocked
           ? new ApiError('failed-precondition', 'Esse horário está bloqueado na agenda (almoço ou bloqueio). Escolha outro.')
           : new ApiError('already-exists', 'Esse horário acabou de ser ocupado. Escolha outro.')
@@ -574,7 +605,7 @@ export async function publicServices(fs: Firestore) {
   const [{ name }, barbers] = await Promise.all([businessInfo(fs), listBarbers(fs)])
   return {
     businessName: name,
-    barbers,
+    barbers: barbers.map(({ id, name }) => ({ id, name })),
     services: docs
       .map((d) => ({
         id: d.id,

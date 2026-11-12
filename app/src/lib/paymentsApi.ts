@@ -1,4 +1,5 @@
 import { callApi } from './api'
+import type { WorkSchedule } from '../types'
 
 export const subscribePlanFn = callApi<
   { planId: string },
@@ -67,5 +68,7 @@ export const updateTeamMemberFn = callApi<
   { id: string; attends?: boolean; commissionPercent?: number; active?: boolean; name?: string },
   { ok: true }
 >('updateTeamMember')
+
+export const setWorkScheduleFn = callApi<{ id: string; schedule: WorkSchedule | null }, { ok: true }>('setWorkSchedule')
 
 export const setCollaboratorPasswordFn = callApi<{ id: string; password: string }, { ok: true }>('setCollaboratorPassword')

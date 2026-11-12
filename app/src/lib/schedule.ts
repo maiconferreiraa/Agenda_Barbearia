@@ -1,4 +1,4 @@
-import type { Appointment, BusinessSettings } from '../types'
+import type { Appointment, BusinessSettings, UserProfile } from '../types'
 
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 
@@ -72,4 +72,27 @@ export const WEEKDAY_LABELS: Record<keyof BusinessSettings['hours'], string> = {
   fri: 'Sexta',
   sat: 'Sábado',
   sun: 'Domingo',
+}
+
+/** Dias/horários e almoço que valem para quem atende: os dele, se configurou; senão os da barbearia. */
+export function scheduleOf(settings: BusinessSettings, member?: Pick<UserProfile, 'schedule'> | null) {
+  const own = member?.schedule
+  if (!own?.hours) return { hours: settings.hours, lunch: settings.lunch, own: false }
+  return { hours: own.hours, lunch: own.lunch ?? { enabled: false, start: '12:00', end: '13:00' }, own: true }
+}
+
+/** Junta os horários de vários barbeiros (visão "Todos" da agenda): abre no mais cedo, fecha no mais tarde. */
+export function mergedSchedule(settings: BusinessSettings, members: Pick<UserProfile, 'schedule'>[]) {
+  if (members.length === 0) return scheduleOf(settings)
+  const each = members.map((m) => scheduleOf(settings, m))
+  const hours = { ...settings.hours }
+  for (const k of Object.keys(hours) as (keyof BusinessSettings['hours'])[]) {
+    const on = each.map((e) => e.hours[k]).filter((d) => d?.enabled)
+    hours[k] = on.length
+      ? { enabled: true, open: on.map((d) => d.open).sort()[0], close: on.map((d) => d.close).sort().at(-1)! }
+      : { ...hours[k], enabled: false }
+  }
+  const l = each.map((e) => e.lunch)
+  const same = l.every((x) => x?.enabled && x.start === l[0]?.start && x.end === l[0]?.end)
+  return { hours, lunch: same ? l[0] : undefined, own: false }
 }

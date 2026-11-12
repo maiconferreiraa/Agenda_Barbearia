@@ -12,7 +12,7 @@ import { useBarbers } from '../../hooks/useTeam'
 import { useAuth } from '../../contexts/AuthContext'
 import { appointmentPaymentLabel, formatTime } from '../../lib/format'
 import { useBusinessSettings } from '../../hooks/useBusinessSettings'
-import { weekdayKeyFor } from '../../lib/schedule'
+import { mergedSchedule, scheduleOf, weekdayKeyFor } from '../../lib/schedule'
 import type { AgendaBlock, Appointment, AppointmentStatus } from '../../types'
 import { OwnerBookModal } from '../../components/OwnerBookModal'
 
@@ -123,13 +123,18 @@ export function Agenda() {
   const selectedName = barbers.find((b) => b.uid === selected)?.name
   const [blocking, setBlocking] = useState<number | 'day' | null>(null)
   const { settings } = useBusinessSettings()
-  const dayHours = settings.hours[weekdayKeyFor(day)]
+  // horário e almoço de quem está na tela (o próprio de cada barbeiro, se configurou)
+  const sched = barberMode
+    ? scheduleOf(settings, profile)
+    : selected === 'all'
+      ? mergedSchedule(settings, barbers)
+      : scheduleOf(settings, barbers.find((b) => b.uid === selected))
+  const dayHours = sched.hours[weekdayKeyFor(day)]
   const isOpen = !!dayHours?.enabled
   const step = settings.slotDurationMinutes || 60
+  const lunchCfg = sched.lunch
   const lunch =
-    settings.lunch?.enabled && settings.lunch.start && settings.lunch.end
-      ? { start: toMinutes(settings.lunch.start), end: toMinutes(settings.lunch.end) }
-      : null
+    lunchCfg?.enabled && lunchCfg.start && lunchCfg.end ? { start: toMinutes(lunchCfg.start), end: toMinutes(lunchCfg.end) } : null
   const grid = isOpen
     ? buildDay(toMinutes(dayHours.open), toMinutes(dayHours.close), step, appointments, blocks, lunch)
     : { slots: [] as Slot[], outside: appointments }
@@ -226,7 +231,7 @@ export function Agenda() {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-neutral-500">
             Aberto das {dayHours.open} às {dayHours.close}
-            {lunch ? ` · almoço ${settings.lunch!.start}–${settings.lunch!.end}` : ''}
+            {lunch ? ` · almoço ${lunchCfg!.start}–${lunchCfg!.end}` : ''}
           </p>
           {!dayFullyBlocked && (
             <Button
@@ -240,7 +245,7 @@ export function Agenda() {
                       : 'Bloquear o dia inteiro? Nenhum cliente vai conseguir marcar neste dia. Os horários já marcados continuam.',
                   )
                 )
-                  block(toMinutes(dayHours.open), toMinutes(dayHours.close) - toMinutes(dayHours.open), 'day')
+                  block(0, 24 * 60, 'day')
               }}
               className="!px-2.5 !py-1 text-xs"
             >
@@ -252,7 +257,11 @@ export function Agenda() {
 
       {!loading && !isOpen && (
         <Card className="text-center text-sm text-neutral-500">
-          Fechado neste dia. (Horário de funcionamento em Configurações.)
+          {barberMode
+            ? 'Você não trabalha neste dia. (Mude em Meus horários.)'
+            : sched.own
+              ? `${selectedName ?? 'Este barbeiro'} não trabalha neste dia. (Mude em Equipe → Dias e horários.)`
+              : 'Fechado neste dia. (Horário de funcionamento em Configurações.)'}
         </Card>
       )}
 

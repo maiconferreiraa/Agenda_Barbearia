@@ -18,6 +18,8 @@ export interface UserProfile {
   active?: boolean
   /** Comissão do colaborador em % sobre o que ele produz. */
   commissionPercent?: number
+  /** Dias, horários e almoço próprios de quem atende (sem = os da barbearia). */
+  schedule?: WorkSchedule | null
   /** Aniversário "MM-DD" (sem ano), para a mensagem do dia. */
   birthday?: string | null
   /** Ficha criada pelo dono na importação do sistema antigo (sem login no app). */
@@ -217,6 +219,11 @@ export interface DayHours {
   enabled: boolean
   open: string
   close: string
+}
+
+export interface WorkSchedule {
+  hours: BusinessSettings['hours']
+  lunch?: { enabled: boolean; start: string; end: string }
 }
 
 export interface BusinessSettings {

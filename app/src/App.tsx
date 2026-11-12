@@ -11,6 +11,7 @@ import { BarberLayout, OwnerLayout } from './components/layout/OwnerLayout'
 import { Team } from './pages/owner/Team'
 import { BarberClients } from './pages/barber/BarberClients'
 import { BarberProduction } from './pages/barber/BarberProduction'
+import { MySchedule } from './pages/barber/MySchedule'
 import { Dashboard } from './pages/owner/Dashboard'
 import { Agenda } from './pages/owner/Agenda'
 import { Services } from './pages/owner/Services'
@@ -74,6 +75,8 @@ export default function App() {
         <Route index element={<Agenda />} />
         <Route path="clients" element={<BarberClients />} />
         <Route path="production" element={<BarberProduction />} />
+        <Route path="schedule" element={<MySchedule />} />
+        <Route path="plans" element={<Plans readOnly />} />
       </Route>
 
       <Route
