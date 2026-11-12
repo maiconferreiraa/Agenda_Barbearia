@@ -30,7 +30,7 @@ interface AuthContextValue {
     password: string
     inviteCode?: string
     /** Usuário para entrar sem e-mail (ex.: maicon.ferreira). */
-    username?: string
+    username?: string; birthday?: string
   }) => Promise<void>
   /** Aceita e-mail ou usuário (ex.: maicon.ferreira). */
   login: (emailOrUsername: string, password: string) => Promise<void>
@@ -75,6 +75,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     inviteCode?: string
     /** Usuário para entrar sem e-mail (ex.: maicon.ferreira). */
     username?: string
+    /** Aniversário "MM-DD" (opcional). */
+    birthday?: string
   }) {
     const username = input.username?.trim().toLowerCase()
     if (username) {
@@ -104,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     await setDoc(doc(db, 'users', cred.user.uid), {
       ...newProfile,
+      birthday: input.birthday || null,
       createdAt: serverTimestamp(),
     })
     if (username) {

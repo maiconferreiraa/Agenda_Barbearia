@@ -62,6 +62,11 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // ---- controle do "cliente sumido" (só o servidor) ----
+    match /winback/{phone} {
+      allow read, write: if false;
+    }
+
     // ---- códigos de ligação de conta (só o servidor) ----
     match /linkCodes/{uid} {
       allow read, write: if false;

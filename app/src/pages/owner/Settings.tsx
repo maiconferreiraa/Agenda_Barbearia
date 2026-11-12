@@ -114,6 +114,62 @@ export function Settings() {
           />
         </Card>
 
+        <Card className="space-y-4">
+          <h2 className="font-display text-base text-gold-light">Mensagens automáticas (trazer cliente de volta)</h2>
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 text-sm text-neutral-200">
+              <input
+                type="checkbox"
+                checked={form.winback?.enabled !== false}
+                onChange={(e) => setForm((f) => ({ ...f, winback: { days: 30, ...f.winback, enabled: e.target.checked } }))}
+              />
+              💈 <b>Cliente sumido</b>: chamar quem não vem há
+              <select
+                value={form.winback?.days ?? 30}
+                disabled={form.winback?.enabled === false}
+                onChange={(e) => setForm((f) => ({ ...f, winback: { enabled: true, ...f.winback, days: Number(e.target.value) } }))}
+                className="rounded-md border border-ink-border bg-ink-soft px-1.5 py-1 text-sm text-neutral-100 disabled:opacity-40"
+              >
+                {[20, 30, 45, 60, 90].map((d) => (
+                  <option key={d} value={d}>
+                    {d} dias
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Input
+              label="Oferta para quem sumiu (opcional)"
+              placeholder="Ex.: Barba grátis no próximo corte"
+              value={form.winback?.offer ?? ''}
+              disabled={form.winback?.enabled === false}
+              onChange={(e) => setForm((f) => ({ ...f, winback: { enabled: true, days: 30, ...f.winback, offer: e.target.value } }))}
+            />
+            <p className="text-xs text-neutral-500">
+              Uma mensagem por ausência ("Sentimos sua falta… marque seu horário"). Quem já tem horário marcado não recebe.
+            </p>
+          </div>
+          <div className="space-y-2 border-t border-ink-border pt-3">
+            <label className="flex items-center gap-2 text-sm text-neutral-200">
+              <input
+                type="checkbox"
+                checked={form.birthday?.enabled !== false}
+                onChange={(e) => setForm((f) => ({ ...f, birthday: { ...f.birthday, enabled: e.target.checked } }))}
+              />
+              🎉 <b>Aniversário</b>: mensagem no dia
+            </label>
+            <Input
+              label="Presente de aniversário (opcional)"
+              placeholder="Ex.: 20% de desconto no corte esta semana"
+              value={form.birthday?.gift ?? ''}
+              disabled={form.birthday?.enabled === false}
+              onChange={(e) => setForm((f) => ({ ...f, birthday: { enabled: true, ...f.birthday, gift: e.target.value } }))}
+            />
+            <p className="text-xs text-neutral-500">
+              Vale para quem informou o aniversário no cadastro (ou você preencheu em Clientes). As mensagens saem às 10h.
+            </p>
+          </div>
+        </Card>
+
         <Card className="space-y-3">
           <h2 className="font-display text-base text-gold-light">Taxas da InfinitePay</h2>
           <p className="text-sm text-neutral-400">

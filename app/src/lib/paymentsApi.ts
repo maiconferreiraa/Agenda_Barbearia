@@ -40,12 +40,16 @@ export const importSubscriptionFn = callApi<
     paid: boolean | 'card'
     usage: Record<string, number>
     welcome: boolean
+    birthday?: string | null
   },
   { subscriptionId: string; clientId: string; checkoutUrl: string | null; welcomeQueued: boolean; reusedClient: boolean }
 >('importSubscription')
 
 /** Dono corrige o telefone (WhatsApp) de um cliente. */
-export const updateClientPhoneFn = callApi<{ clientId: string; phone: string }, { phone: string }>('updateClientPhone')
+export const updateClientPhoneFn = callApi<
+  { clientId: string; phone: string; birthday?: string | null },
+  { phone: string; birthday: string | null }
+>('updateClientPhone')
 
 /** Cartão recorrente: dono confirma que o pagamento apareceu na InfinitePay. */
 export const confirmCardPaymentFn = callApi<{ subscriptionId: string }, { ok: true }>('confirmCardPayment')

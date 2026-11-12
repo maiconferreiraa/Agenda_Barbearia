@@ -5,6 +5,7 @@ import { Modal } from './ui/Modal'
 import { Button } from './ui/Button'
 import { Input, Select } from './ui/Field'
 import { PhoneInput } from './ui/PhoneInput'
+import { BirthdayInput } from './ui/BirthdayInput'
 import { usePlans } from '../hooks/usePlans'
 import { usePaymentSettings } from '../hooks/usePaymentSettings'
 import { formatCurrency } from '../lib/format'
@@ -43,6 +44,7 @@ export function ImportSubscriptionModal({ open, onClose }: { open: boolean; onCl
   const [paid, setPaid] = useState<boolean | 'card' | null>(null)
   const [usage, setUsage] = useState<Record<string, number>>({})
   const [welcome, setWelcome] = useState(true)
+  const [birthday, setBirthday] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [done, setDone] = useState('')
@@ -64,6 +66,7 @@ export function ImportSubscriptionModal({ open, onClose }: { open: boolean; onCl
     setPaid(null)
     setUsage({})
     setWelcome(true)
+    setBirthday('')
     setError('')
     setDone('')
   }
@@ -113,7 +116,7 @@ export function ImportSubscriptionModal({ open, onClose }: { open: boolean; onCl
     setSaving(true)
     setError('')
     try {
-      const r = await importSubscriptionFn({ name: name.trim(), phone, planId: plan.id, dueDate, paid, usage, welcome })
+      const r = await importSubscriptionFn({ name: name.trim(), phone, planId: plan.id, dueDate, paid, usage, welcome, birthday: birthday || null })
       setDone(
         `${name.trim()} importado no plano ${plan.name}.` +
           (r.data.reusedClient ? ' (Já tinha cadastro com esse telefone — usei o mesmo.)' : '') +
@@ -155,6 +158,7 @@ export function ImportSubscriptionModal({ open, onClose }: { open: boolean; onCl
 
         <Input label="Nome do cliente" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome completo" />
         <PhoneInput label="WhatsApp do cliente" value={phone} onChange={setPhone} />
+        <BirthdayInput value={birthday} onChange={setBirthday} />
 
         <Select label="Plano" value={planId} onChange={(e) => setPlanId(e.target.value)}>
           <option value="">Escolha…</option>

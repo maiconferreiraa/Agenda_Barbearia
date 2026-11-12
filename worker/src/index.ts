@@ -30,6 +30,7 @@ import { runBilling } from './scheduled'
 import { runAppointmentReminders } from './reminders'
 import { runHolidayNotices } from './holidays'
 import { runAutoComplete } from './autoComplete'
+import { runMarketing } from './marketing'
 import { confirmLinkCode, requestLinkCode } from './api/linkAccount'
 
 /** Endpoints chamados pelo app: POST /api/<nome>, com o token de login. */
@@ -138,7 +139,9 @@ export default {
         .then(() => runHolidayNotices(env))
         .catch((err) => console.error('Avisos de feriado falharam', String(err)))
         .then(() => runAutoComplete(env))
-        .catch((err) => console.error('Concluir sozinho falhou', String(err))),
+        .catch((err) => console.error('Concluir sozinho falhou', String(err)))
+        .then(() => runMarketing(env))
+        .catch((err) => console.error('Marketing falhou', String(err))),
     )
   },
 } satisfies ExportedHandler<Env>

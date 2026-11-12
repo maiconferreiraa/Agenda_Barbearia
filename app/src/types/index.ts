@@ -11,6 +11,8 @@ export interface UserProfile {
   /** Usuário para entrar sem e-mail (ex.: maicon.ferreira). */
   username?: string
   fcmTokens?: string[]
+  /** Aniversário "MM-DD" (sem ano), para a mensagem do dia. */
+  birthday?: string | null
   /** Ficha criada pelo dono na importação do sistema antigo (sem login no app). */
   imported?: boolean
   hasAccount?: boolean
@@ -218,6 +220,9 @@ export interface BusinessSettings {
   >
   /** Oferta mandada no WhatsApp para quem cancela o plano. */
   retentionOffer?: string
+  /** Marketing automático (ligados quando não configurado). */
+  winback?: { enabled: boolean; days: number; offer?: string }
+  birthday?: { enabled: boolean; gift?: string }
   /** Pausa de todo dia (almoço): não aparece horário livre nesse intervalo. */
   lunch?: { enabled: boolean; start: string; end: string }
 }

@@ -95,6 +95,7 @@ export async function importSubscription(ctx: Ctx) {
       phone,
       email: null,
       role: 'client',
+      birthday: normalizeBirthday(data.birthday) ?? null,
       imported: true,
       hasAccount: false,
       createdAt: now,
@@ -181,7 +182,21 @@ export async function importSubscription(ctx: Ctx) {
   return { subscriptionId: subId, clientId, checkoutUrl, welcomeQueued, reusedClient: !createdUser }
 }
 
-/** POST /api/updateClientPhone { clientId, phone } — dono corrige o telefone de um cliente. */
+/** "15/03", "1503" ou "03-15" → "03-15" (mês-dia). Vazio = sem aniversário. */
+export function normalizeBirthday(raw: unknown): string | null | undefined {
+  if (raw === undefined) return undefined
+  if (raw === null || raw === '') return null
+  const s = String(raw).trim()
+  let m = /^(\d{2})-(\d{2})$/.exec(s)
+  const [mm, dd] = m ? [Number(m[1]), Number(m[2])] : (() => {
+    m = /^(\d{1,2})\/(\d{1,2})$/.exec(s)
+    return m ? [Number(m[2]), Number(m[1])] : [0, 0]
+  })()
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) throw new ApiError('invalid-argument', 'Aniversário inválido (dia/mês).')
+  return `${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`
+}
+
+/** POST /api/updateClientPhone { clientId, phone, birthday? } — dono corrige telefone/aniversário de um cliente. */
 export async function updateClientPhone(ctx: Ctx) {
   const { fs, data } = ctx
   await requireOwner(ctx)
@@ -193,6 +208,7 @@ export async function updateClientPhone(ctx: Ctx) {
   if (!user || user.data.role !== 'client') throw new ApiError('not-found', 'Cliente não encontrado.')
   const other = await fs.query('users', { where: [{ field: 'phone', op: '==', value: phone }], limit: 2 })
   if (other.some((u) => u.id !== clientId)) throw new ApiError('already-exists', 'Esse telefone já é de outro cliente.')
-  await fs.update(`users/${clientId}`, { phone })
-  return { phone }
+  const birthday = normalizeBirthday(data.birthday)
+  await fs.update(`users/${clientId}`, { phone, ...(birthday !== undefined ? { birthday } : {}) })
+  return { phone, birthday: birthday ?? null }
 }

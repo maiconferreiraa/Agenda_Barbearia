@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Field'
 import { PasswordInput } from '../../components/ui/PasswordInput'
 import { PhoneInput } from '../../components/ui/PhoneInput'
+import { BirthdayInput } from '../../components/ui/BirthdayInput'
 import { PHONE_RULE, isValidPhone } from '../../lib/phone'
 import { USERNAME_RULE, suggestUsername, usernameAvailableFn } from '../../lib/bookingApi'
 
@@ -18,6 +19,7 @@ export function Register() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [birthday, setBirthday] = useState('')
   const [password, setPassword] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [username, setUsername] = useState('')
@@ -53,7 +55,7 @@ export function Register() {
       if (!isValidPhone(phone)) throw new Error(`Telefone inválido. ${PHONE_RULE}`)
       if (usernameState === 'taken') throw new Error('Esse usuário já existe. Escolha outro.')
       if (usernameState === 'invalid') throw new Error('Usuário inválido: use letras, números, ponto ou _ (3 a 30).')
-      await register({ name, email, phone, password, inviteCode, username: username.trim() || undefined })
+      await register({ name, email, phone, password, inviteCode, username: username.trim() || undefined, birthday: birthday || undefined })
       navigate('/')
     } catch (err) {
       const code = (err as { code?: string }).code
@@ -120,6 +122,7 @@ export function Register() {
             </p>
           </div>
           <PhoneInput required value={phone} onChange={setPhone} />
+          <BirthdayInput value={birthday} onChange={setBirthday} />
           <PasswordInput
             label="Senha"
             autoComplete="new-password"

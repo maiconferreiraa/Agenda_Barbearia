@@ -4,6 +4,7 @@ import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { Spinner } from '../../components/ui/Spinner'
 import { PhoneInput } from '../../components/ui/PhoneInput'
+import { BirthdayInput } from '../../components/ui/BirthdayInput'
 import { StatusBadge } from '../../components/StatusBadge'
 import { useClients } from '../../hooks/useClients'
 import { useAllSubscriptions } from '../../hooks/useSubscriptions'
@@ -17,12 +18,14 @@ export function Clients() {
   const { data: subscriptions } = useAllSubscriptions()
   const [editing, setEditing] = useState<UserProfile | null>(null)
   const [phone, setPhone] = useState('')
+  const [birthday, setBirthday] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   function openEdit(c: UserProfile) {
     setEditing(c)
     setPhone(cleanPhone(c.phone))
+    setBirthday(c.birthday ?? '')
     setError('')
   }
 
@@ -31,7 +34,7 @@ export function Clients() {
     setSaving(true)
     setError('')
     try {
-      await updateClientPhoneFn({ clientId: editing.uid, phone })
+      await updateClientPhoneFn({ clientId: editing.uid, phone, birthday: birthday || null })
       setEditing(null)
     } catch (err) {
       setError((err as Error).message)
@@ -44,13 +47,14 @@ export function Clients() {
     <div className="space-y-4">
       <h1 className="font-display text-2xl text-neutral-100">Clientes</h1>
 
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={`Telefone de ${editing?.name ?? ''}`}>
+      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing?.name ?? ''}>
         <div className="space-y-3">
           <PhoneInput label="WhatsApp" value={phone} onChange={setPhone} />
           <p className="text-xs text-neutral-500">Os avisos de mensalidade e de horário vão para este número.</p>
+          <BirthdayInput value={birthday} onChange={setBirthday} label="Aniversário" />
           {error && <p className="text-sm text-red-400">{error}</p>}
           <Button className="w-full" disabled={!isValidPhone(phone)} loading={saving} onClick={savePhone}>
-            Salvar telefone
+            Salvar
           </Button>
         </div>
       </Modal>
@@ -85,7 +89,8 @@ export function Clients() {
                   className={`truncate text-left text-xs underline-offset-2 hover:underline ${phoneOk ? 'text-neutral-500' : 'text-amber-400'}`}
                   title="Corrigir telefone"
                 >
-                  {c.phone ? (phoneOk ? c.phone : `${c.phone} · corrigir`) : 'sem telefone · adicionar'} ✎
+                  {c.phone ? (phoneOk ? c.phone : `${c.phone} · corrigir`) : 'sem telefone · adicionar'}
+                  {c.birthday ? ` · 🎂 ${c.birthday.slice(3)}/${c.birthday.slice(0, 2)}` : ''} ✎
                 </button>
               </div>
               {activeSub ? (

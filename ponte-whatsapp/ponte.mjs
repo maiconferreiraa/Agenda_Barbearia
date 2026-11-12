@@ -25,6 +25,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { initializeApp, cert } from 'firebase-admin/app'
 import { getFirestore, FieldValue } from 'firebase-admin/firestore'
+import { backupDoDia } from './backup.mjs'
 import { conectar, desconectar, enviarArquivo, enviarTexto, estaConectado, estaDeslogado, pedirCodigo, quandoMudar } from './whatsapp.mjs'
 
 const PASTA = path.join(os.homedir(), '.config', 'barbearia-prime')
@@ -244,6 +245,11 @@ async function main() {
       await processarFila()
     } catch (err) {
       log('erro lendo a fila:', err.message)
+    }
+    try {
+      await backupDoDia(db, log)
+    } catch (err) {
+      log('backup do dia falhou (tento de novo na próxima volta):', err.message)
     }
     if (!umaVez) await dormir(INTERVALO_MS)
   } while (!umaVez)
