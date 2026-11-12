@@ -96,8 +96,22 @@ export async function runHolidayNotices(env: Env) {
       continue
     }
     const name = String(h.data.name ?? 'Feriado')
-    const day = `${formatBr(date).slice(0, 5)} (${WEEKDAYS[new Date(date.getTime() - 3 * 3600e3).getUTCDay()]})`
-    const validUntil = date // depois do feriado não faz sentido mandar
+    const end = (h.data.endDate as Date | undefined) ?? date
+    const partial = h.data.partial as { start?: string; end?: string } | undefined
+    const dayLabel = (d: Date) => `${formatBr(d).slice(0, 5)} (${WEEKDAYS[new Date(d.getTime() - 3 * 3600e3).getUTCDay()]})`
+    const day = dayLabel(date)
+    const sameDay = formatBr(end) === formatBr(date)
+    // "No dia 17/11 (terça)" · "De 20/12 (sábado) a 05/01 (segunda)" · "No dia 17/11 (terça), das 14:00 às 18:00"
+    const when = !sameDay
+      ? `De *${dayLabel(date)}* a *${dayLabel(end)}*`
+      : partial?.start && partial.end
+        ? `No dia *${day}*, das *${partial.start} às ${partial.end}*`
+        : `No dia *${day}*`
+    const closedText = partial?.start ? 'não vai atender' : 'vai estar *fechada*'
+    // Motivo pessoal (férias, médico…) é só do dono: o cliente vê só que vai fechar.
+    // Feriado nacional pode aparecer pelo nome.
+    const publicName = h.data.key ? ` (${name}),` : ','
+    const validUntil = date // depois que começar, não faz sentido mandar
     const writes = [...people.entries()].map(([to, client]) =>
       fs.createWrite(`whatsappOutbox/${fs.newId()}`, {
         to,
@@ -110,7 +124,7 @@ export async function runHolidayNotices(env: Env) {
         createdAt: now,
         text:
           `📅 Oi, ${firstName(client)}! Aviso da ${shop.name}:\n\n` +
-          `No dia *${day}* — ${name} — vamos estar *fechados*.\n\n` +
+          `${when}${publicName} a barbearia ${closedText}.\n\n` +
           `Quer cortar antes? Garanta seu horário agora, sem deixar pra última hora:\n${env.APP_BASE_URL}\n\nAté lá! 💈`,
       }),
     )
@@ -122,7 +136,7 @@ export async function runHolidayNotices(env: Env) {
       targetRole: 'owner',
       relatedId: h.id,
       title: '📅 Aviso de feriado enviado',
-      message: `O aviso de ${name} (${day}) entrou na fila para ${writes.length} cliente(s). O WhatsApp manda aos poucos, sem atrapalhar os avisos de pagamento.`,
+      message: `O aviso de ${name} (${sameDay ? day : `${day} a ${dayLabel(end)}`}) entrou na fila para ${writes.length} cliente(s). O WhatsApp manda aos poucos, sem atrapalhar os avisos de pagamento.`,
     })
   }
 }

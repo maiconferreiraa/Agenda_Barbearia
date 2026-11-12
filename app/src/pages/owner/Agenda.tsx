@@ -220,7 +220,7 @@ export function Agenda() {
                   ) : slot.block ? (
                     <div className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-red-500/30 bg-red-500/5 px-3 py-1.5 text-xs text-red-300">
                       <span>⛔ {slot.block.reason === 'Dia fechado' ? 'Dia bloqueado' : slot.block.reason || 'Bloqueado'}</span>
-                      {slot.block.id.startsWith('holiday-') ? (
+                      {slot.block.id.startsWith('holiday-') || slot.block.id.startsWith('closure-') ? (
                         <Link to="/owner/holidays" className="underline underline-offset-2">
                           ver em Feriados
                         </Link>

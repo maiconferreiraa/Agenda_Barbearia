@@ -10,7 +10,7 @@ import { useAuth } from '../../contexts/AuthContext'
 const NAV = [
   { to: '/owner', label: 'Painel', icon: '📊', end: true },
   { to: '/owner/agenda', label: 'Agenda', icon: '🗓️' },
-  { to: '/owner/holidays', label: 'Feriados', icon: '📅' },
+  { to: '/owner/holidays', label: 'Folgas e feriados', icon: '📅' },
   { to: '/owner/finance', label: 'Financeiro', icon: '💰' },
   { to: '/owner/services', label: 'Serviços', icon: '✂️' },
   { to: '/owner/plans', label: 'Planos', icon: '🏷️' },
