@@ -13,6 +13,7 @@ import { PlanBanner } from '../../components/PlanBanner'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { Input, Textarea } from '../../components/ui/Field'
+import { CARD_RECURRING_ENABLED } from '../../lib/features'
 import { Spinner } from '../../components/ui/Spinner'
 import { useServices } from '../../hooks/useServices'
 import { usePlans } from '../../hooks/usePlans'
@@ -51,7 +52,10 @@ export function Plans() {
       price: Number(form.get('price')),
       active: form.get('active') === 'on',
       includedServices,
-      recurringLink: String(form.get('recurringLink') || '').trim() || null,
+      // em espera: sem o campo na tela, mantém o que já estiver salvo
+      recurringLink: CARD_RECURRING_ENABLED
+        ? String(form.get('recurringLink') || '').trim() || null
+        : (editing?.recurringLink ?? null),
     }
     if (payload.recurringLink && !/^https:\/\/([a-z0-9-]+\.)*infinitepay\.io\//i.test(payload.recurringLink)) {
       alert('O link de cobrança recorrente precisa ser um link da InfinitePay (começa com https:// e tem infinitepay.io).')
@@ -106,9 +110,11 @@ export function Plans() {
               <p className="font-display text-gold-light">{formatCurrency(p.price)}/mês</p>
             </div>
             {p.description && <p className="mt-1 text-xs text-neutral-400">{p.description}</p>}
-            <p className="mt-1 text-xs text-neutral-500">
-              {p.recurringLink ? '💳 Cartão recorrente (InfinitePay)' : '🔗 Link mensal (Pix ou cartão)'}
-            </p>
+            {CARD_RECURRING_ENABLED && (
+              <p className="mt-1 text-xs text-neutral-500">
+                {p.recurringLink ? '💳 Cartão recorrente (InfinitePay)' : '🔗 Link mensal (Pix ou cartão)'}
+              </p>
+            )}
             <ul className="mt-2 space-y-0.5 text-xs text-neutral-400">
               {p.includedServices.map((i) => (
                 <li key={i.serviceId}>
@@ -166,6 +172,7 @@ export function Plans() {
             </div>
           </div>
 
+          {CARD_RECURRING_ENABLED && (
           <div className="space-y-1.5 rounded-lg border border-ink-border p-3">
             <Input
               name="recurringLink"
@@ -181,6 +188,7 @@ export function Plans() {
               todo mês.
             </p>
           </div>
+          )}
 
           <label className="flex items-center gap-2 text-sm text-neutral-300">
             <input type="checkbox" name="active" defaultChecked={editing?.active ?? true} />

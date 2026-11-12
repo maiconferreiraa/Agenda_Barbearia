@@ -10,6 +10,7 @@ import { usePaymentSettings } from '../hooks/usePaymentSettings'
 import { formatCurrency } from '../lib/format'
 import { isValidPhone } from '../lib/phone'
 import { importSubscriptionFn } from '../lib/paymentsApi'
+import { CARD_RECURRING_ENABLED } from '../lib/features'
 
 /** Dias de atraso até o plano vencer (mesmo valor do servidor, worker/src/scheduled.ts). */
 const GRACE_DAYS = 10
@@ -191,11 +192,13 @@ export function ImportSubscriptionModal({ open, onClose }: { open: boolean; onCl
 
         <div className="space-y-2">
           <p className="text-xs font-medium text-neutral-400">A mensalidade deste mês</p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <button type="button" className={choice(paid === 'card')} onClick={() => setPaid('card')}>
-              <p className="text-sm font-medium text-neutral-100">💳 Cartão recorrente</p>
-              <p className="text-xs text-neutral-500">Já desconta sozinho na InfinitePay</p>
-            </button>
+          <div className={`grid grid-cols-2 gap-2 ${CARD_RECURRING_ENABLED ? 'sm:grid-cols-3' : ''}`}>
+            {CARD_RECURRING_ENABLED && (
+              <button type="button" className={choice(paid === 'card')} onClick={() => setPaid('card')}>
+                <p className="text-sm font-medium text-neutral-100">💳 Cartão recorrente</p>
+                <p className="text-xs text-neutral-500">Já desconta sozinho na InfinitePay</p>
+              </button>
+            )}
             <button type="button" className={choice(paid === true)} onClick={() => setPaid(true)}>
               <p className="text-sm font-medium text-neutral-100">✅ Já pagou</p>
               <p className="text-xs text-neutral-500">Está em dia</p>
