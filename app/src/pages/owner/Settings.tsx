@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, Fragment } from 'react'
 import { doc, setDoc } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { Card } from '../../components/ui/Card'
@@ -81,7 +81,8 @@ export function Settings() {
           <div className="grid grid-cols-2 gap-3">
             <PhoneInput value={form.phone ?? ''} onChange={(phone) => setForm((f) => ({ ...f, phone }))} />
             <Input
-              label="Duração do horário (min)"
+              label="Grade da agenda (min)"
+              hint="Só a divisão da agenda. Os horários livres seguem o tempo de cada serviço."
               type="number"
               min={5}
               step={5}
@@ -150,6 +151,51 @@ export function Settings() {
           <p className="text-xs text-neutral-500">
             Vale para as mensalidades pagas pelo sistema (link mensal e cartão recorrente). É uma estimativa: o valor
             exato de cada pagamento fica no app da InfinitePay.
+          </p>
+        </Card>
+
+        <Card className="space-y-3">
+          <h2 className="font-display text-base text-gold-light">Almoço (pausa de todo dia)</h2>
+          <div className="grid grid-cols-[6.5rem_minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+            <label className="flex items-center gap-2 text-sm text-neutral-300">
+              <input
+                type="checkbox"
+                checked={!!form.lunch?.enabled}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    lunch: { start: '12:00', end: '13:00', ...f.lunch, enabled: e.target.checked },
+                  }))
+                }
+              />
+              Almoço
+            </label>
+            {(['start', 'end'] as const).map((k, i) => (
+              <Fragment key={k}>
+                {i === 1 && <span className="text-neutral-500">até</span>}
+                <select
+                  value={form.lunch?.[k] ?? (k === 'start' ? '12:00' : '13:00')}
+                  disabled={!form.lunch?.enabled}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      lunch: { enabled: true, start: '12:00', end: '13:00', ...f.lunch, [k]: e.target.value },
+                    }))
+                  }
+                  className="w-full min-w-0 rounded-md border border-ink-border bg-ink-soft px-1.5 py-1.5 text-sm text-neutral-100 disabled:opacity-40"
+                >
+                  {timeOptions(form.lunch?.[k] ?? '').map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </Fragment>
+            ))}
+          </div>
+          <p className="text-xs text-neutral-500">
+            Nesse intervalo não aparece horário para os clientes, em todos os dias. Para bloquear um horário só de um
+            dia, use a Agenda.
           </p>
         </Card>
 

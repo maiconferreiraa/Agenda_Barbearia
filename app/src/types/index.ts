@@ -214,6 +214,16 @@ export interface BusinessSettings {
   >
   /** Oferta mandada no WhatsApp para quem cancela o plano. */
   retentionOffer?: string
+  /** Pausa de todo dia (almoço): não aparece horário livre nesse intervalo. */
+  lunch?: { enabled: boolean; start: string; end: string }
+}
+
+/** Horário bloqueado pelo dono na agenda (agendaBlocks). */
+export interface AgendaBlock {
+  id: string
+  date: Timestamp
+  durationMinutes: number
+  reason?: string
 }
 
 /** ownerSettings/taxas — só o dono lê (regras do Firestore). Em %; a API da InfinitePay não informa. */

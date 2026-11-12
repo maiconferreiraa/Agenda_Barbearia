@@ -29,6 +29,27 @@ const DEFAULT_SETTINGS: Data = {
     sat: { enabled: true, open: '09:00', close: '17:00' },
     sun: { enabled: false, open: '09:00', close: '13:00' },
   },
+  // Pausa de todo dia (almoço): ninguém marca nesse intervalo.
+  lunch: { enabled: true, start: '12:00', end: '13:00' },
+}
+
+async function loadSettings(fs: Firestore): Promise<Data> {
+  const saved = (await fs.get('businessSettings/main'))?.data
+  return { ...DEFAULT_SETTINGS, ...(saved ?? {}) }
+}
+
+/** Almoço do dia como intervalo ocupado (minutos do dia). */
+function lunchRange(settings: Data): Range[] {
+  const l = settings.lunch as { enabled?: boolean; start?: string; end?: string } | undefined
+  if (!l?.enabled || !l.start || !l.end) return []
+  const start = toMinutes(l.start)
+  const end = toMinutes(l.end)
+  return end > start ? [{ start, end }] : []
+}
+
+interface Range {
+  start: number
+  end: number
 }
 
 function toMinutes(time: string) {
@@ -36,21 +57,30 @@ function toMinutes(time: string) {
   return h * 60 + m
 }
 
-/** Minutos de início possíveis no dia (horário de Brasília), sem descontar ocupação. */
-function candidateStarts(day: Date, duration: number, settings: Data): number[] {
+/**
+ * Horários livres do dia (minutos, Brasília) para um atendimento de `duration` min.
+ * Anda da abertura em passos do próprio serviço (Barba 30 min → 8:00, 8:30…);
+ * ao bater num horário ocupado, almoço ou bloqueio, continua logo depois dele.
+ */
+function freeStarts(day: Date, duration: number, settings: Data, busy: Range[]): number[] {
   const p = sp(day)
   const hours = (settings.hours as Record<string, DayHours> | undefined)?.[WEEKDAY_KEYS[p.weekday]]
-  if (!hours?.enabled) return []
-  const step = Number(settings.slotDurationMinutes) || 60
+  if (!hours?.enabled || duration <= 0) return []
   const open = toMinutes(hours.open)
   const close = toMinutes(hours.close)
 
   const now = sp(new Date())
   const isToday = now.year === p.year && now.month === p.month && now.day === p.day
   const out: number[] = []
-  for (let start = open; start + duration <= close; start += step) {
-    if (isToday && start <= now.minutes) continue
-    out.push(start)
+  let t = open
+  while (t + duration <= close) {
+    const hit = busy.filter((b) => t < b.end && t + duration > b.start)
+    if (hit.length > 0) {
+      t = Math.max(...hit.map((b) => b.end))
+      continue
+    }
+    if (!isToday || t > now.minutes) out.push(t)
+    t += duration
   }
   return out
 }
@@ -72,7 +102,13 @@ async function loadServices(fs: Firestore, serviceIds: unknown) {
   })
 }
 
-function busyRanges(docs: { data: Data }[]) {
+/** Bloqueios que o dono fez na agenda (agendaBlocks) no dia. */
+async function blockRanges(fs: Firestore, date: Date, txQuery?: Firestore['query']) {
+  const q = txQuery ?? fs.query.bind(fs)
+  return busyRanges(await q('agendaBlocks', { where: dayRange(date) }))
+}
+
+function busyRanges(docs: { data: Data }[]): Range[] {
   return docs
     .map((d) => d.data)
     .filter((a) => a.status !== 'canceled')
@@ -96,16 +132,16 @@ export async function getAvailableSlots({ fs, data }: Ctx) {
   if (Number.isNaN(day.getTime())) throw new ApiError('invalid-argument', 'Data inválida.')
   const duration = services.reduce((s, x) => s + x.durationMinutes, 0)
 
-  const saved = (await fs.get('businessSettings/main'))?.data
-  const settings = { ...DEFAULT_SETTINGS, ...(saved ?? {}) }
-  const candidates = candidateStarts(day, duration, settings)
-  if (candidates.length === 0) return { slots: [] }
-
-  const busy = busyRanges(await fs.query('appointments', { where: dayRange(day) }))
+  const settings = await loadSettings(fs)
+  const [appts, blocks] = await Promise.all([
+    fs.query('appointments', { where: dayRange(day) }),
+    blockRanges(fs, day),
+  ])
+  const busy = [...busyRanges(appts), ...blocks, ...lunchRange(settings)]
   const p = sp(day)
-  const slots = candidates
-    .filter((start) => !busy.some((b) => start < b.end && start + duration > b.start))
-    .map((start) => spDate(p.year, p.month, p.day, start).toISOString())
+  const slots = freeStarts(day, duration, settings, busy).map((start) =>
+    spDate(p.year, p.month, p.day, start).toISOString(),
+  )
   return { slots }
 }
 
@@ -130,13 +166,18 @@ async function createAppointment(fs: Firestore, input: BookInput) {
   const services = await loadServices(fs, input.serviceIds)
   const totalDuration = services.reduce((s, x) => s + x.durationMinutes, 0)
   const appointmentId = fs.newId()
+  const settings = await loadSettings(fs)
 
   const appointment = await fs.runTransaction(async (tx) => {
     const dayDocs = await tx.query('appointments', { where: dayRange(date) })
+    const blocks = busyRanges(await tx.query('agendaBlocks', { where: dayRange(date) }))
     const start = sp(date).minutes
     const end = start + totalDuration
     if (busyRanges(dayDocs).some((b) => start < b.end && end > b.start)) {
       throw new ApiError('already-exists', 'Esse horário acabou de ser ocupado. Escolha outro.')
+    }
+    if ([...blocks, ...lunchRange(settings)].some((b) => start < b.end && end > b.start)) {
+      throw new ApiError('failed-precondition', 'Esse horário está bloqueado na agenda (almoço ou bloqueio). Escolha outro.')
     }
 
     let subscriptionId: string | null = null
@@ -221,6 +262,9 @@ export async function bookAppointment({ env, fs, uid, data }: Ctx) {
     title: 'Novo agendamento',
     message: `${appointment.clientName} agendou ${appointment.serviceName} em ${formatDateTimeBr(date)}.`,
   })
+  if (appointment.clientPhone) {
+    await confirmByWhatsapp(fs, appointmentId, appointment.clientName, appointment.clientPhone, appointment)
+  }
   return { appointmentId, usedPlanCredit: appointment.usedPlanCredit }
 }
 
@@ -407,6 +451,19 @@ export async function setAppointmentStatus(ctx: Ctx) {
         `Seu horário de ${appt.serviceName} em ${formatDateTimeBr(appt.date as Date)} foi cancelado.` +
         (creditReturned ? ' O crédito voltou para o seu plano.' : ''),
     })
+    if (appt.clientPhone && (appt.date as Date).getTime() > Date.now()) {
+      const { name } = await businessInfo(fs)
+      await queueWhatsapp(fs, {
+        phone: appt.clientPhone,
+        kind: 'appointment_canceled',
+        relatedId: id,
+        text:
+          `Olá, ${firstName(appt.clientName)}. Seu horário de *${appt.serviceName}* em ` +
+          `${formatDateTimeBr(appt.date as Date)} foi *cancelado* pela barbearia.` +
+          (creditReturned ? '\nO crédito voltou para o seu plano.' : '') +
+          `\n\nPara marcar outro horário, é só responder aqui ou entrar no app.\n\n${name}`,
+      })
+    }
     return { ok: true, creditReturned }
   }
 

@@ -1,14 +1,17 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Timestamp, addDoc, collection, deleteDoc, doc } from 'firebase/firestore'
+import { db } from '../../firebase'
 import { setAppointmentStatusFn } from '../../lib/bookingApi'
 import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
-import { useAppointmentsRange } from '../../hooks/useAppointments'
+import { useAppointmentsRange, useBlocksRange } from '../../hooks/useAppointments'
 import { appointmentPaymentLabel, formatTime } from '../../lib/format'
 import { useBusinessSettings } from '../../hooks/useBusinessSettings'
 import { weekdayKeyFor } from '../../lib/schedule'
-import type { Appointment, AppointmentStatus } from '../../types'
+import type { AgendaBlock, Appointment, AppointmentStatus } from '../../types'
 import { OwnerBookModal } from '../../components/OwnerBookModal'
 
 function toMinutes(time: string) {
@@ -28,16 +31,34 @@ interface Slot {
   appointments: Appointment[]
   /** Atendimento que começou antes e ainda ocupa este horário. */
   continuing?: Appointment
+  /** Bloqueio do dono que cobre este horário. */
+  block?: AgendaBlock
+  /** Cai na pausa de almoço (Configurações). */
+  lunch?: boolean
+}
+
+function blockMinutes(b: AgendaBlock) {
+  const d = b.date.toDate()
+  return d.getHours() * 60 + d.getMinutes()
 }
 
 /** Monta a grade do dia (abertura → fechamento, de `step` em `step` minutos). */
-function buildDay(open: number, close: number, step: number, appts: Appointment[]) {
+function buildDay(
+  open: number,
+  close: number,
+  step: number,
+  appts: Appointment[],
+  blocks: AgendaBlock[],
+  lunch: { start: number; end: number } | null,
+) {
   const active = appts.filter((a) => a.status !== 'canceled')
   const slots: Slot[] = []
   for (let t = open; t < close; t += step) {
     const starting = appts.filter((a) => minutesOf(a) >= t && minutesOf(a) < t + step)
     const continuing = active.find((a) => minutesOf(a) < t && minutesOf(a) + a.durationMinutes > t)
-    slots.push({ start: t, appointments: starting, continuing })
+    const block = blocks.find((b) => blockMinutes(b) <= t && blockMinutes(b) + b.durationMinutes > t)
+    const inLunch = !!lunch && t < lunch.end && t + step > lunch.start
+    slots.push({ start: t, appointments: starting, continuing, block, lunch: inLunch })
   }
   const outside = appts.filter((a) => minutesOf(a) < open || minutesOf(a) >= close)
   return { slots, outside }
@@ -76,13 +97,46 @@ export function Agenda() {
   const [day, setDay] = useState(() => startOfDay(new Date()))
   const [booking, setBooking] = useState(false)
   const { data: appointments, loading } = useAppointmentsRange(day, endOfDay(day))
+  const { data: blocks } = useBlocksRange(day, endOfDay(day))
+  const [blocking, setBlocking] = useState<number | 'day' | null>(null)
   const { settings } = useBusinessSettings()
   const dayHours = settings.hours[weekdayKeyFor(day)]
   const isOpen = !!dayHours?.enabled
   const step = settings.slotDurationMinutes || 60
+  const lunch =
+    settings.lunch?.enabled && settings.lunch.start && settings.lunch.end
+      ? { start: toMinutes(settings.lunch.start), end: toMinutes(settings.lunch.end) }
+      : null
   const grid = isOpen
-    ? buildDay(toMinutes(dayHours.open), toMinutes(dayHours.close), step, appointments)
+    ? buildDay(toMinutes(dayHours.open), toMinutes(dayHours.close), step, appointments, blocks, lunch)
     : { slots: [] as Slot[], outside: appointments }
+
+  /** Bloqueia `minutes` minutos a partir de `start` (minutos do dia) — some para os clientes. */
+  async function block(start: number, minutes: number, key: number | 'day') {
+    setBlocking(key)
+    try {
+      const at = new Date(day)
+      at.setHours(0, start, 0, 0)
+      await addDoc(collection(db, 'agendaBlocks'), {
+        date: Timestamp.fromDate(at),
+        durationMinutes: minutes,
+        reason: key === 'day' ? 'Dia fechado' : 'Bloqueado',
+        createdAt: Timestamp.now(),
+      })
+    } catch (err) {
+      alert('Não foi possível bloquear. ' + (err as Error).message)
+    } finally {
+      setBlocking(null)
+    }
+  }
+  async function unblock(b: AgendaBlock) {
+    try {
+      await deleteDoc(doc(db, 'agendaBlocks', b.id))
+    } catch (err) {
+      alert('Não foi possível desbloquear. ' + (err as Error).message)
+    }
+  }
+  const dayFullyBlocked = isOpen && grid.slots.length > 0 && grid.slots.every((s) => s.block)
 
   async function changeStatus(id: string, status: AppointmentStatus) {
     try {
@@ -120,9 +174,25 @@ export function Agenda() {
       {loading && <Spinner full />}
 
       {!loading && isOpen && (
-        <p className="text-xs text-neutral-500">
-          Aberto das {dayHours.open} às {dayHours.close} · horários de {step} min
-        </p>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-neutral-500">
+            Aberto das {dayHours.open} às {dayHours.close}
+            {lunch ? ` · almoço ${settings.lunch!.start}–${settings.lunch!.end}` : ''}
+          </p>
+          {!dayFullyBlocked && (
+            <Button
+              variant="secondary"
+              loading={blocking === 'day'}
+              onClick={() => {
+                if (confirm('Bloquear o dia inteiro? Nenhum cliente vai conseguir marcar neste dia. Os horários já marcados continuam.'))
+                  block(toMinutes(dayHours.open), toMinutes(dayHours.close) - toMinutes(dayHours.open), 'day')
+              }}
+              className="!px-2.5 !py-1 text-xs"
+            >
+              ⛔ Bloquear o dia todo
+            </Button>
+          )}
+        </div>
       )}
 
       {!loading && !isOpen && (
@@ -147,14 +217,42 @@ export function Agenda() {
                     <div className="rounded-lg border border-dashed border-ink-border px-3 py-2.5 text-xs text-neutral-500">
                       Ocupado — continuação de {slot.continuing.clientName} ({formatTime(slot.continuing.date)})
                     </div>
+                  ) : slot.block ? (
+                    <div className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-red-500/30 bg-red-500/5 px-3 py-1.5 text-xs text-red-300">
+                      <span>⛔ {slot.block.reason === 'Dia fechado' ? 'Dia bloqueado' : slot.block.reason || 'Bloqueado'}</span>
+                      {slot.block.id.startsWith('holiday-') ? (
+                        <Link to="/owner/holidays" className="underline underline-offset-2">
+                          ver em Feriados
+                        </Link>
+                      ) : (
+                        <button type="button" onClick={() => unblock(slot.block!)} className="underline underline-offset-2">
+                          desbloquear{slot.block.reason === 'Dia fechado' ? ' o dia' : ''}
+                        </button>
+                      )}
+                    </div>
+                  ) : slot.lunch ? (
+                    <div className="rounded-lg border border-dashed border-ink-border px-3 py-2.5 text-xs text-neutral-500">
+                      🍽 Almoço
+                    </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setBooking(true)}
-                      className="w-full rounded-lg border border-dashed border-ink-border px-3 py-2.5 text-left text-xs text-emerald-400/80 hover:border-gold-dark"
-                    >
-                      Livre <span className="text-neutral-500">· toque para marcar</span>
-                    </button>
+                    <div className="flex items-stretch gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setBooking(true)}
+                        className="flex-1 rounded-lg border border-dashed border-ink-border px-3 py-2.5 text-left text-xs text-emerald-400/80 hover:border-gold-dark"
+                      >
+                        Livre <span className="text-neutral-500">· toque para marcar</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={blocking === slot.start}
+                        onClick={() => block(slot.start, step, slot.start)}
+                        title="Bloquear este horário para os clientes"
+                        className="rounded-lg border border-dashed border-ink-border px-2.5 text-xs text-neutral-500 hover:border-red-500/40 hover:text-red-300 disabled:opacity-50"
+                      >
+                        Bloquear
+                      </button>
+                    </div>
                   ))}
               </div>
             </div>

@@ -62,6 +62,16 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // ---- feriados e dias fechados (o servidor avisa os clientes) ----
+    match /holidays/{day} {
+      allow read, write: if isOwner();
+    }
+
+    // ---- horários bloqueados pelo dono na agenda (o servidor desconta dos livres) ----
+    match /agendaBlocks/{blockId} {
+      allow read, write: if isOwner();
+    }
+
     // ---- horários cancelados (resumo para o relatório; o horário em si é apagado) ----
     match /canceledAppointments/{appointmentId} {
       allow read: if isOwner();

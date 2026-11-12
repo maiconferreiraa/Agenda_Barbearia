@@ -37,6 +37,9 @@ const MAX_TENTATIVAS = 3
 const VALIDADE_MS = 48 * 60 * 60 * 1000 // mensagem velha (PC desligado) não sai mais
 const HORA_INICIO = 8 // só envia entre 8h e 21h (horário de Brasília)
 const HORA_FIM = 21
+// Avisos em massa (ex.: feriado) têm prioridade baixa: saem depois dos avisos de
+// pagamento/horário e deixam esta folga do limite diário para eles.
+const FOLGA_PRIORIDADE = 12
 
 function log(...args) {
   console.log(new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }), '[ponte]', ...args)
@@ -108,23 +111,30 @@ async function processarFila() {
   if (hora < HORA_INICIO || hora >= HORA_FIM) return
   if (!estaConectado()) return
 
-  const snap = await db.collection('whatsappOutbox').where('status', '==', 'pending').limit(20).get()
+  const snap = await db.collection('whatsappOutbox').where('status', '==', 'pending').limit(60).get()
   if (snap.empty) return
 
+  // Primeiro os avisos normais (pagamento, horário), depois os em massa; cada grupo por ordem de chegada.
+  const baixa = (d) => (d.data().priority === 'low' ? 1 : 0)
   const docs = snap.docs.sort(
-    (a, b) => (a.data().createdAt?.toMillis?.() ?? 0) - (b.data().createdAt?.toMillis?.() ?? 0),
+    (a, b) => baixa(a) - baixa(b) || (a.data().createdAt?.toMillis?.() ?? 0) - (b.data().createdAt?.toMillis?.() ?? 0),
   )
 
   let enviados = 0
   for (const doc of docs) {
     const msg = doc.data()
     const criada = msg.createdAt?.toMillis?.() ?? Date.now()
-    if (Date.now() - criada > VALIDADE_MS) {
+    const validaAte = msg.validUntil?.toMillis?.() ?? criada + VALIDADE_MS
+    if (Date.now() > validaAte) {
       await doc.ref.update({ status: 'expired' })
       log('expirada (mais de 48 h na fila):', doc.id, msg.kind)
       continue
     }
 
+    if (msg.priority === 'low' && enviadosHoje() >= MAX_POR_DIA - FOLGA_PRIORIDADE) {
+      log('avisos em massa pausados até amanhã (folga do limite diário para pagamentos e horários)')
+      return
+    }
     if (enviadosHoje() >= MAX_POR_DIA) {
       log(`limite de ${MAX_POR_DIA} mensagens por dia atingido — o resto sai amanhã`)
       return

@@ -27,6 +27,8 @@ import { importSubscription, updateClientPhone } from './api/importSubscription'
 import { confirmCardPayment, markCardRefused } from './api/cardRecurring'
 import { claimUsername, loginWithUsername, usernameAvailable } from './api/username'
 import { runBilling } from './scheduled'
+import { runAppointmentReminders } from './reminders'
+import { runHolidayNotices } from './holidays'
 
 /** Endpoints chamados pelo app: POST /api/<nome>, com o token de login. */
 const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
@@ -122,6 +124,14 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(runBilling(env))
+    // Cobrança primeiro; o lembrete de horário usa o que sobrar do limite de chamadas.
+    ctx.waitUntil(
+      runBilling(env)
+        .catch((err) => console.error('Régua de cobrança falhou', String(err)))
+        .then(() => runAppointmentReminders(env))
+        .catch((err) => console.error('Lembretes de horário falharam', String(err)))
+        .then(() => runHolidayNotices(env))
+        .catch((err) => console.error('Avisos de feriado falharam', String(err))),
+    )
   },
 } satisfies ExportedHandler<Env>

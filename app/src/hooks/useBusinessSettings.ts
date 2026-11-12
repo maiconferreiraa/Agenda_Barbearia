@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: BusinessSettings = {
   address: '',
   slotDurationMinutes: 60,
   hours: DEFAULT_BUSINESS_HOURS,
+  lunch: { enabled: true, start: '12:00', end: '13:00' },
 }
 
 export function useBusinessSettings() {
