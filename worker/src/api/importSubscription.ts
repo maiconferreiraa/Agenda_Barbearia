@@ -114,7 +114,8 @@ export async function importSubscription(ctx: Ctx) {
     ...sub,
     status: 'active',
     usage,
-    currentPeriodStart: addMonths(due, -1),
+    // nunca no futuro: senão o que for marcado antes disso não devolve crédito ao desmarcar
+    currentPeriodStart: new Date(Math.min(addMonths(due, -1).getTime(), now.getTime())),
     currentPeriodEnd: due,
     // créditos novos no dia do vencimento, quando a mensalidade for paga
     creditsResetAt: card ? null : due,
