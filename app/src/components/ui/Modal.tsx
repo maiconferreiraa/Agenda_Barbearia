@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 export function Modal({
   open,
@@ -12,7 +13,9 @@ export function Modal({
   children: ReactNode
 }) {
   if (!open) return null
-  return (
+  // Portal no <body>: dentro de um Card (backdrop-blur) o "fixed" ficaria preso ao cartão
+  // e os cartões de baixo cobririam a janela.
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center">
       <div
         className="absolute inset-0"
@@ -32,6 +35,7 @@ export function Modal({
         </div>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

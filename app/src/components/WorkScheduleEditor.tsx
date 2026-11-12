@@ -5,7 +5,7 @@ import { Card } from './ui/Card'
 import { Button } from './ui/Button'
 import { useBusinessSettings } from '../hooks/useBusinessSettings'
 import { useBarberAppointments, useBarberBlocks } from '../hooks/useAppointments'
-import { WEEKDAY_LABELS, scheduleOf } from '../lib/schedule'
+import { WEEKDAY_LABELS, scheduleOf, weekdayKeyFor } from '../lib/schedule'
 import { nationalHolidays } from '../lib/holidayCalendar'
 import { setWorkScheduleFn } from '../lib/paymentsApi'
 import type { AgendaBlock, BusinessSettings, DayHours, UserProfile, WorkSchedule } from '../types'
@@ -103,7 +103,7 @@ export function WorkScheduleEditor({ member, self }: { member: UserProfile; self
                 setSaved(false)
               }}
             />
-            Horário próprio de {you}
+            {you === 'você' ? 'Meu horário próprio' : `Horário próprio de ${you}`}
           </label>
         </div>
 
@@ -183,13 +183,14 @@ export function WorkScheduleEditor({ member, self }: { member: UserProfile; self
         </Button>
       </Card>
 
-      <DaysOff member={member} you={you} />
+      <DaysOff member={member} you={you} hours={current.hours} />
     </div>
   )
 }
 
 /** Folgas, férias e feriados: bloqueia o dia inteiro só na agenda desta pessoa. */
-function DaysOff({ member, you }: { member: UserProfile; you: string }) {
+function DaysOff({ member, you, hours }: { member: UserProfile; you: string; hours: BusinessSettings['hours'] }) {
+  const agendaDe = you === 'você' ? 'a sua agenda' : `a agenda de ${you}`
   const blocks = useBarberBlocks(member.uid)
   const appts = useBarberAppointments(member.uid)
   const today = ymdOf(new Date())
@@ -302,7 +303,7 @@ function DaysOff({ member, you }: { member: UserProfile; you: string }) {
           loading={busy === 'range'}
           onClick={() => closeDays(eachDay(from, to || from), reason, 'range')}
         >
-          Fechar a agenda de {you} nesses dias
+          Fechar {agendaDe} nesses dias
         </Button>
         {offDays.length > 0 && (
           <ul className="divide-y divide-ink-border text-sm">
@@ -318,7 +319,7 @@ function DaysOff({ member, you }: { member: UserProfile; you: string }) {
             ))}
           </ul>
         )}
-        <p className="text-xs text-neutral-500">Fecha só a agenda de {you}. Os outros barbeiros continuam atendendo.</p>
+        <p className="text-xs text-neutral-500">Fecha só {agendaDe}. Os outros barbeiros continuam atendendo.</p>
       </Card>
 
       <Card className="space-y-2">
@@ -327,15 +328,23 @@ function DaysOff({ member, you }: { member: UserProfile; you: string }) {
           {holidays.map((h) => {
             const closedShop = shop.get(h.ymd)
             const off = mine.has(h.ymd)
+            const worksThatDay = !!hours[weekdayKeyFor(parseYmd(h.ymd))]?.enabled
             return (
               <li key={h.ymd} className="flex items-center justify-between gap-2 py-1.5">
                 <span className="min-w-0 text-neutral-300">
                   {brDay(h.ymd)} · {h.name}
-                  <span className={`block text-xs ${closedShop || off ? 'text-red-400' : 'text-emerald-400'}`}>
-                    {closedShop ? 'Barbearia fechada' : off ? `${you === 'você' ? 'Você não vai' : `${you} não vai`} atender` : 'Atendendo normal'}
+                  <span className={`block text-xs ${closedShop || off ? 'text-red-400' : !worksThatDay ? 'text-neutral-500' : 'text-emerald-400'}`}>
+                    {closedShop
+                      ? 'Barbearia fechada'
+                      : !worksThatDay
+                        ? 'Dia de folga (não trabalha neste dia da semana)'
+                        : off
+                          ? `${you === 'você' ? 'Você não vai' : `${you} não vai`} atender`
+                          : 'Atendendo normal'}
                   </span>
                 </span>
                 {!closedShop &&
+                  worksThatDay &&
                   (off ? (
                     <Button variant="secondary" loading={busy === h.ymd} onClick={() => reopen(h.ymd)} className="!px-2.5 !py-1 text-xs">
                       Vou atender
