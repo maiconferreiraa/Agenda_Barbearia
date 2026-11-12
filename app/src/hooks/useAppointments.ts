@@ -8,9 +8,26 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { useCollection } from './useCollection'
-import type { Appointment } from '../types'
+import type { Appointment, CanceledAppointment } from '../types'
 
 /** Todos os agendamentos dentro de um intervalo de datas (visão do dono). */
+/** Cancelamentos do período (pela data em que o horário seria). */
+export function useCanceledRange(start: Date, end: Date) {
+  const startMs = start.getTime()
+  const endMs = end.getTime()
+  const q = useMemo(
+    () =>
+      query(
+        collection(db, 'canceledAppointments'),
+        where('date', '>=', Timestamp.fromMillis(startMs)),
+        where('date', '<=', Timestamp.fromMillis(endMs)),
+        orderBy('date', 'asc'),
+      ),
+    [startMs, endMs],
+  )
+  return useCollection<CanceledAppointment>(q)
+}
+
 export function useAppointmentsRange(start: Date, end: Date) {
   const startMs = start.getTime()
   const endMs = end.getTime()

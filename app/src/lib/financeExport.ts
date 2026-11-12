@@ -1,4 +1,16 @@
 import type { FinanceReport, Period } from './finance'
+import logoUrl from '../assets/logo.jpg'
+
+/** Carrega a logo como data URL para o jsPDF. */
+async function loadImage(url: string): Promise<string> {
+  const blob = await (await fetch(url)).blob()
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
 
 /** Nome de arquivo: relatorio-financeiro-2026-11.csv / -2026.pdf / -semana-2026-11-10.pdf */
 function fileBase(p: Period) {
@@ -64,6 +76,9 @@ export function exportCsv(shop: string, p: Period, r: FinanceReport) {
   lines.push([])
   lines.push(['SAÍDAS (DETALHADO)'], ['Data', 'Descrição', 'Tipo', 'Fixa', 'Valor'])
   for (const d of r.expenseDetails) lines.push([dateBr(d.date), d.item, d.method, d.recurring ? 'sim' : 'não', d.amount])
+  lines.push([])
+  lines.push(['CANCELAMENTOS'], ['Data', 'Cliente', 'Serviço', 'Cancelou', 'Tipo', 'Valor'])
+  for (const d of r.canceledDetails) lines.push([dateBr(d.date), d.client, d.item, d.canceledBy, d.method, d.amount])
 
   const csv = lines.map((l) => l.map(csvCell).join(';')).join('\r\n')
   // BOM: faz o Excel reconhecer acentos (UTF-8)
@@ -81,6 +96,15 @@ export async function exportPdf(shop: string, p: Period, r: FinanceReport) {
   const head = { fillColor: [26, 26, 29] as [number, number, number], textColor: 255 }
   const money = { halign: 'right' as const }
   let y = 48
+
+  // Logo da barbearia no topo (720×344 → 150×72 pt)
+  try {
+    const logo = await loadImage(logoUrl)
+    doc.addImage(logo, 'JPEG', left, 28, 150, 72)
+    y = 124
+  } catch {
+    /* sem logo: segue só com o título */
+  }
 
   doc.setFontSize(16)
   doc.text(`Relatório financeiro — ${shop}`, left, y)
@@ -109,6 +133,7 @@ export async function exportPdf(shop: string, p: Period, r: FinanceReport) {
       [`Mensalidades (${r.plansCount} pagamento(s))`, brl(r.plansTotal)],
       [`Avulsos no balcão (${r.walkInCount} atendimento(s))`, brl(r.walkInTotal)],
       ['Serviços feitos pelo plano', String(r.creditUses)],
+      ['Horários cancelados', String(r.canceledCount)],
     ],
     columnStyles: { 1: money },
   })
@@ -157,6 +182,13 @@ export async function exportPdf(shop: string, p: Period, r: FinanceReport) {
     'Saídas (detalhado)',
     ['Data', 'Descrição', 'Tipo', 'Fixa', 'Valor'],
     r.expenseDetails.map((d) => [dateBr(d.date), d.item, d.method, d.recurring ? 'sim' : 'não', brl(d.amount)]),
+    [4],
+  )
+
+  table(
+    'Cancelamentos',
+    ['Data', 'Cliente', 'Serviço', 'Cancelou', 'Valor'],
+    r.canceledDetails.map((d) => [dateBr(d.date), d.client, d.item, d.canceledBy, d.method === 'Plano' ? 'plano' : brl(d.amount)]),
     [4],
   )
 

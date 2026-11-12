@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../../firebase'
 import { Card } from '../../components/ui/Card'
+import { PlanBanner } from '../../components/PlanBanner'
 import { Button } from '../../components/ui/Button'
 import { Modal } from '../../components/ui/Modal'
 import { Input, Textarea } from '../../components/ui/Field'
@@ -50,6 +51,11 @@ export function Plans() {
       price: Number(form.get('price')),
       active: form.get('active') === 'on',
       includedServices,
+      recurringLink: String(form.get('recurringLink') || '').trim() || null,
+    }
+    if (payload.recurringLink && !/^https:\/\/([a-z0-9-]+\.)*infinitepay\.io\//i.test(payload.recurringLink)) {
+      alert('O link de cobrança recorrente precisa ser um link da InfinitePay (começa com https:// e tem infinitepay.io).')
+      return
     }
 
     setSaving(true)
@@ -93,12 +99,16 @@ export function Plans() {
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {plans.map((p) => (
-          <Card key={p.id} className={!p.active ? 'opacity-50' : ''}>
+          <Card key={p.id} className={`overflow-hidden ${!p.active ? 'opacity-50' : ''}`}>
+            <PlanBanner />
             <div className="flex items-start justify-between">
               <p className="font-medium text-neutral-100">{p.name}</p>
               <p className="font-display text-gold-light">{formatCurrency(p.price)}/mês</p>
             </div>
             {p.description && <p className="mt-1 text-xs text-neutral-400">{p.description}</p>}
+            <p className="mt-1 text-xs text-neutral-500">
+              {p.recurringLink ? '💳 Cartão recorrente (InfinitePay)' : '🔗 Link mensal (Pix ou cartão)'}
+            </p>
             <ul className="mt-2 space-y-0.5 text-xs text-neutral-400">
               {p.includedServices.map((i) => (
                 <li key={i.serviceId}>
@@ -154,6 +164,22 @@ export function Plans() {
                 <p className="text-xs text-neutral-500">Nenhum serviço ativo cadastrado.</p>
               )}
             </div>
+          </div>
+
+          <div className="space-y-1.5 rounded-lg border border-ink-border p-3">
+            <Input
+              name="recurringLink"
+              type="url"
+              label="💳 Link de cobrança recorrente da InfinitePay (opcional)"
+              defaultValue={editing?.recurringLink ?? ''}
+              placeholder="https://…infinitepay.io/…"
+            />
+            <p className="text-xs text-neutral-500">
+              No app da InfinitePay: <b>Vendas → Planos e Recorrência → Planos e cobranças</b> → toque no plano com o
+              mesmo valor → <b>copiar link</b>, e cole aqui. O cliente se cadastra lá, paga o 1º mês na hora e a
+              InfinitePay desconta sozinha todo mês. Sem link, o sistema manda um link de pagamento (Pix ou cartão)
+              todo mês.
+            </p>
           </div>
 
           <label className="flex items-center gap-2 text-sm text-neutral-300">

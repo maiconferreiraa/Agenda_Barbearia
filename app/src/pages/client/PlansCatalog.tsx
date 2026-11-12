@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Card } from '../../components/ui/Card'
+import { PlanBanner } from '../../components/PlanBanner'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
 import { usePlans } from '../../hooks/usePlans'
@@ -71,13 +72,19 @@ export function PlansCatalog() {
 
       <div className="grid gap-3 sm:grid-cols-2">
         {plans.map((p) => (
-          <Card key={p.id} className="flex flex-col">
+          <Card key={p.id} className="flex flex-col overflow-hidden">
+            <PlanBanner />
             <p className="font-display text-lg text-neutral-100">{p.name}</p>
             <p className="mt-1 font-display text-2xl text-gold-light">
               {formatCurrency(p.price)}
               <span className="text-sm text-neutral-500">/mês</span>
             </p>
             {p.description && <p className="mt-2 text-sm text-neutral-400">{p.description}</p>}
+            {p.recurringLink && (
+              <p className="mt-2 text-xs text-neutral-500">
+                💳 Cartão de crédito: você paga o 1º mês agora e depois é descontado sozinho todo mês.
+              </p>
+            )}
             <ul className="mt-3 space-y-1 text-sm text-neutral-300">
               {p.includedServices.map((i) => (
                 <li key={i.serviceId}>✓ {i.quantity}x {i.serviceName} por mês</li>

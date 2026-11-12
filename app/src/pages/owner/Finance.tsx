@@ -4,7 +4,7 @@ import clsx from 'clsx'
 import { Card } from '../../components/ui/Card'
 import { Spinner } from '../../components/ui/Spinner'
 import { RevenueChart, SERIES } from '../../components/RevenueChart'
-import { useAppointmentsRange } from '../../hooks/useAppointments'
+import { useAppointmentsRange, useCanceledRange } from '../../hooks/useAppointments'
 import { usePaymentsRange } from '../../hooks/usePayments'
 import { useExpenses } from '../../hooks/useExpenses'
 import { ExpensesCard } from '../../components/ExpensesCard'
@@ -58,9 +58,10 @@ export function Finance() {
   const { data: payments, loading: loadingPay } = usePaymentsRange(period.start, period.end)
   const { data: appointments, loading: loadingAppt } = useAppointmentsRange(period.start, period.end)
   const { data: expenses, loading: loadingExp } = useExpenses()
+  const { data: canceled } = useCanceledRange(period.start, period.end)
   const report = useMemo(
-    () => buildReport(period, payments, appointments, expenses),
-    [period, payments, appointments, expenses],
+    () => buildReport(period, payments, appointments, expenses, canceled),
+    [period, payments, appointments, expenses, canceled],
   )
   const total = report.plansTotal + report.walkInTotal
   const loading = loadingPay || loadingAppt || loadingExp
@@ -222,6 +223,48 @@ export function Finance() {
                 showTotal={false}
                 empty="Nenhum serviço feito com crédito do plano neste período."
               />
+            </Card>
+            <Card className="md:col-span-2">
+              <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="font-display text-base text-neutral-100">Cancelamentos</h2>
+                {report.canceledCount > 0 && (
+                  <p className="text-xs text-neutral-500">
+                    {report.canceledCount} horário(s)
+                    {report.canceledValue > 0 ? ` · ${formatCurrency(report.canceledValue)} em avulsos que não entraram` : ''}
+                  </p>
+                )}
+              </div>
+              {report.canceledCount === 0 ? (
+                <p className="text-sm text-neutral-500">Nenhum horário cancelado neste período.</p>
+              ) : (
+                <div className="max-h-72 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-left text-xs text-neutral-500">
+                      <tr>
+                        <th className="py-1 font-normal">Dia</th>
+                        <th className="py-1 font-normal">Cliente</th>
+                        <th className="py-1 font-normal">Serviço</th>
+                        <th className="py-1 font-normal">Cancelou</th>
+                        <th className="py-1 text-right font-normal">Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-neutral-300">
+                      {report.canceledDetails.map((c, i) => (
+                        <tr key={i} className="border-t border-ink-border">
+                          <td className="py-1 whitespace-nowrap">
+                            {c.date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}{' '}
+                            {c.date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </td>
+                          <td className="py-1">{c.client}</td>
+                          <td className="py-1">{c.item}</td>
+                          <td className="py-1">{c.canceledBy}</td>
+                          <td className="py-1 text-right tabular-nums">{c.method === 'Plano' ? 'plano' : formatCurrency(c.amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </Card>
           </div>
 

@@ -5,6 +5,7 @@ import { savedHandle } from '../infinitepay'
 import { notify } from '../notify'
 import { addMonths, brl, formatBr, spDate } from '../time'
 import { PHONE_RULE, businessInfo, firstName, queueWhatsapp, strictPhoneBr } from '../whatsapp'
+import { CARD_MODE, cleanRecurringLink } from './cardRecurring'
 import type { Ctx } from './ctx'
 import { requireOwner } from './ctx'
 
@@ -40,10 +41,15 @@ export async function importSubscription(ctx: Ctx) {
   if (!planId) throw new ApiError('invalid-argument', 'Escolha o plano.')
   const plan = await fs.get(`plans/${planId}`)
   if (!plan) throw new ApiError('not-found', 'Plano não encontrado.')
-  const paid = data.paid === true
+  // card = já paga no cartão recorrente da InfinitePay (o sistema só acompanha)
+  const card = data.paid === 'card'
+  const paid = data.paid === true || card
   const due = parseDueDate(data.dueDate)
   const now = new Date()
 
+  if (card && due.getTime() < now.getTime()) {
+    throw new ApiError('invalid-argument', 'No cartão recorrente, informe a data da PRÓXIMA cobrança (uma data futura).')
+  }
   if (paid && due.getTime() < now.getTime()) {
     throw new ApiError('invalid-argument', 'Se a mensalidade já foi paga, informe o PRÓXIMO vencimento (uma data futura).')
   }
@@ -110,10 +116,11 @@ export async function importSubscription(ctx: Ctx) {
     currentPeriodStart: addMonths(due, -1),
     currentPeriodEnd: due,
     // créditos novos no dia do vencimento, quando a mensalidade for paga
-    creditsResetAt: due,
+    creditsResetAt: card ? null : due,
     openInvoice: null,
     imported: true,
     importedPaid: paid,
+    ...(card ? { billingMode: CARD_MODE, recurringLink: cleanRecurringLink(plan.data.recurringLink) } : {}),
     billingNextCheck: now,
     createdAt: now,
   })
@@ -152,7 +159,9 @@ export async function importSubscription(ctx: Ctx) {
         `Olá, ${firstName(clientName)}! 💈\n\n` +
         `A ${shop.name} agora tem um sistema novo de planos, e o seu plano *${String(plan.data.name).trim()}* ` +
         `(${brl(plan.data.price)}/mês) já está cadastrado nele.\n\n` +
-        (paid
+        (card
+          ? `✅ Sua mensalidade está em dia. A próxima cobrança cai sozinha no seu cartão em *${formatBr(due)}*.`
+          : paid
           ? `✅ Sua mensalidade está em dia. Próximo vencimento: *${formatBr(due)}*.\n` +
             `Uns dias antes, o link de pagamento (Pix ou cartão) chega aqui no WhatsApp.`
           : `Sua mensalidade de *${formatBr(due)}* (${brl(plan.data.price)}) está em aberto. ` +

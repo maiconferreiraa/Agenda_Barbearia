@@ -185,6 +185,10 @@ export class Firestore {
     return { update: { name: this.name(path), fields }, updateMask: { fieldPaths: mask }, currentDocument: { exists: true } }
   }
 
+  deleteWrite(path: string): Write {
+    return { delete: this.name(path) } as Write
+  }
+
   async commit(writes: Write[], transaction?: string): Promise<void> {
     if (writes.length === 0 && !transaction) return
     await this.call(`${this.docsBase}:commit`, {
@@ -256,5 +260,8 @@ export class Transaction {
   }
   update(path: string, flat: Data) {
     this.writes.push(this.fs.updateWrite(path, flat))
+  }
+  delete(path: string) {
+    this.writes.push(this.fs.deleteWrite(path))
   }
 }

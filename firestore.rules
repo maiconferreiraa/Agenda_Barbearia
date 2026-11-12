@@ -57,6 +57,12 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // ---- horários cancelados (resumo para o relatório; o horário em si é apagado) ----
+    match /canceledAppointments/{appointmentId} {
+      allow read: if isOwner();
+      allow write: if false;
+    }
+
     // ---- assinaturas (planos assinados) ----
     // Só o servidor (/api/*, webhook e régua diária) cria/altera.
     match /subscriptions/{subscriptionId} {

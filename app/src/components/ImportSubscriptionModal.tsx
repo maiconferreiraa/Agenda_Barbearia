@@ -39,7 +39,7 @@ export function ImportSubscriptionModal({ open, onClose }: { open: boolean; onCl
   const [phone, setPhone] = useState('')
   const [planId, setPlanId] = useState('')
   const [dueDate, setDueDate] = useState('')
-  const [paid, setPaid] = useState<boolean | null>(null)
+  const [paid, setPaid] = useState<boolean | 'card' | null>(null)
   const [usage, setUsage] = useState<Record<string, number>>({})
   const [welcome, setWelcome] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -91,6 +91,8 @@ export function ImportSubscriptionModal({ open, onClose }: { open: boolean; onCl
   // O que vai acontecer, em português, antes de salvar.
   const preview = (() => {
     if (problem || !due || !plan) return null
+    if (paid === 'card')
+      return `Nada de link: a InfinitePay segue cobrando o cartão. Em ${br(due)} o sistema renova o plano e os créditos sozinho; se o cartão for recusado, você toca em "Cartão recusado" em Assinaturas.`
     if (paid) {
       const send = new Date(due)
       send.setDate(send.getDate() - INVOICE_LEAD_DAYS)
@@ -189,7 +191,11 @@ export function ImportSubscriptionModal({ open, onClose }: { open: boolean; onCl
 
         <div className="space-y-2">
           <p className="text-xs font-medium text-neutral-400">A mensalidade deste mês</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <button type="button" className={choice(paid === 'card')} onClick={() => setPaid('card')}>
+              <p className="text-sm font-medium text-neutral-100">💳 Cartão recorrente</p>
+              <p className="text-xs text-neutral-500">Já desconta sozinho na InfinitePay</p>
+            </button>
             <button type="button" className={choice(paid === true)} onClick={() => setPaid(true)}>
               <p className="text-sm font-medium text-neutral-100">✅ Já pagou</p>
               <p className="text-xs text-neutral-500">Está em dia</p>
@@ -203,7 +209,7 @@ export function ImportSubscriptionModal({ open, onClose }: { open: boolean; onCl
 
         {paid !== null && (
           <Input
-            label={paid ? 'Próximo vencimento' : 'Vencimento da mensalidade em aberto'}
+            label={paid === 'card' ? 'Próxima cobrança no cartão' : paid ? 'Próximo vencimento' : 'Vencimento da mensalidade em aberto'}
             type="date"
             value={dueDate}
             min={paid ? todayStr() : undefined}

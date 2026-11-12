@@ -13,6 +13,10 @@ import {
 import { notify } from '../notify'
 import { addMonths, formatBr } from '../time'
 import { businessInfo, firstName, queueWhatsapp, retentionText } from '../whatsapp'
+import { CARD_MODE, cleanRecurringLink } from './cardRecurring'
+
+/** Lembrete pro dono quando um plano no cartão recorrente é cancelado. */
+const CARD_CANCEL_TIP = '\n\n⚠️ Esse plano é no *cartão recorrente*: cancele também a recorrência no app da InfinitePay, senão o cartão continua sendo cobrado.'
 
 /** WhatsApp do cancelamento: aviso pro dono e confirmação pro cliente. */
 async function whatsCancel(
@@ -56,7 +60,8 @@ export async function subscribePlan({ env, fs, uid, data }: Ctx) {
   if (user.data.role !== 'client') throw new ApiError('permission-denied', 'Apenas clientes podem assinar planos.')
   if (!plan || plan.data.active !== true) throw new ApiError('not-found', 'Plano indisponível.')
 
-  if (!(await savedHandle(fs))) {
+  const recurringLink = cleanRecurringLink(plan.data.recurringLink)
+  if (!recurringLink && !(await savedHandle(fs))) {
     throw new ApiError('failed-precondition', 'A barbearia ainda não ativou o pagamento online. Fale com a barbearia.')
   }
 
@@ -82,6 +87,36 @@ export async function subscribePlan({ env, fs, uid, data }: Ctx) {
     planName: String(plan.data.name).trim(),
     planPrice: plan.data.price,
   }
+
+  // Cartão recorrente: o cliente vai direto pro link da InfinitePay; o dono confirma o pagamento.
+  if (recurringLink) {
+    await fs.create(`subscriptions/${subId}`, {
+      ...sub,
+      status: 'pending',
+      billingMode: CARD_MODE,
+      recurringLink,
+      usage: {},
+      openInvoice: null,
+      billingNextCheck: now,
+      createdAt: now,
+    })
+    await notify(env, fs, {
+      type: 'plan_chosen',
+      targetRole: 'owner',
+      relatedId: subId,
+      title: '💳 Novo plano no cartão recorrente',
+      message: `${user.data.name} escolheu o plano "${String(plan.data.name).trim()}" no cartão. Quando o pagamento aparecer no app da InfinitePay, toque em "Confirmar pagamento" em Assinaturas.`,
+    })
+    const shop = await businessInfo(fs)
+    await queueWhatsapp(fs, {
+      phone: shop.phone,
+      kind: 'card_chosen_owner',
+      relatedId: subId,
+      text: `💳 ${user.data.name} escolheu o plano *${String(plan.data.name).trim()}* no cartão recorrente. Quando o pagamento aparecer na InfinitePay, confirme em Assinaturas.`,
+    })
+    return { checkoutUrl: recurringLink, cardRecurring: true }
+  }
+
   await fs.create(`subscriptions/${subId}`, {
     ...sub,
     status: 'pending',
@@ -193,6 +228,15 @@ export async function cancelSubscription(ctx: Ctx) {
     title: 'Assinatura cancelada',
     message: `Sua assinatura do plano "${sub.data.planName}" foi cancelada. Não haverá novas cobranças.`,
   })
+  if (sub.data.billingMode === CARD_MODE) {
+    const shop = await businessInfo(fs)
+    await queueWhatsapp(fs, {
+      phone: shop.phone,
+      kind: 'card_cancel_tip',
+      relatedId: subId,
+      text: `❌ Assinatura de ${sub.data.clientName} (${sub.data.planName}) cancelada.${CARD_CANCEL_TIP}`,
+    })
+  }
   await whatsCancel(fs, sub.data, subId, {
     client:
       `Olá, ${firstName(sub.data.clientName)}. Sua assinatura do plano *${sub.data.planName}* foi cancelada ` +
@@ -245,7 +289,8 @@ export async function cancelMyPlan({ env, fs, uid, data }: Ctx) {
     })
     await whatsCancel(fs, sub, subId, {
       owner: `❌ *Plano cancelado pelo cliente*\n\n${sub.clientName} cancelou o plano *${sub.planName}*.` +
-        (end ? ` Ele continua valendo até ${formatBr(end)}.` : ''),
+        (end ? ` Ele continua valendo até ${formatBr(end)}.` : '') +
+        (sub.billingMode === CARD_MODE ? CARD_CANCEL_TIP : ''),
       retention: { validUntil: end ? formatBr(end) : undefined },
     })
     return { status: 'active' }
@@ -265,7 +310,8 @@ export async function cancelMyPlan({ env, fs, uid, data }: Ctx) {
     await whatsCancel(fs, sub, subId, {
       owner:
         `❌ *Plano cancelado pelo cliente*\n\n${sub.clientName} cancelou o plano *${sub.planName}*` +
-        (sub.status === 'past_due' ? ' (estava com mensalidade em atraso).' : '.'),
+        (sub.status === 'past_due' ? ' (estava com mensalidade em atraso).' : '.') +
+        (sub.billingMode === CARD_MODE ? CARD_CANCEL_TIP : ''),
       retention: {},
     })
     return { status: 'canceled' }
@@ -306,6 +352,9 @@ export async function upgradePlan({ env, fs, uid, data }: Ctx) {
   const sub = subDoc.data
 
   if (sub.planId === planId) throw new ApiError('failed-precondition', 'Esse já é o seu plano.')
+  if (sub.billingMode === CARD_MODE) {
+    throw new ApiError('failed-precondition', 'Seu plano é cobrado no cartão recorrente. Para trocar de plano, fale com a barbearia.')
+  }
   if (sub.cancelAtPeriodEnd) {
     throw new ApiError('failed-precondition', 'Seu plano está cancelado. Toque em "Quero manter meu plano" antes do upgrade.')
   }

@@ -2,7 +2,7 @@ import { callApi } from './api'
 
 export const subscribePlanFn = callApi<
   { planId: string },
-  { checkoutUrl: string }
+  { checkoutUrl: string; cardRecurring?: boolean }
 >('subscribePlan')
 
 export const confirmInvoicePaymentFn = callApi<
@@ -36,7 +36,8 @@ export const importSubscriptionFn = callApi<
     planId: string
     /** AAAA-MM-DD */
     dueDate: string
-    paid: boolean
+    /** true = em dia; false = em aberto; 'card' = já paga no cartão recorrente */
+    paid: boolean | 'card'
     usage: Record<string, number>
     welcome: boolean
   },
@@ -45,3 +46,9 @@ export const importSubscriptionFn = callApi<
 
 /** Dono corrige o telefone (WhatsApp) de um cliente. */
 export const updateClientPhoneFn = callApi<{ clientId: string; phone: string }, { phone: string }>('updateClientPhone')
+
+/** Cartão recorrente: dono confirma que o pagamento apareceu na InfinitePay. */
+export const confirmCardPaymentFn = callApi<{ subscriptionId: string }, { ok: true }>('confirmCardPayment')
+
+/** Cartão recorrente: a InfinitePay avisou que a cobrança não passou. */
+export const markCardRefusedFn = callApi<{ subscriptionId: string }, { ok: true }>('markCardRefused')

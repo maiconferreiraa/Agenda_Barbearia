@@ -155,9 +155,33 @@ export function MySubscription() {
 
           {current.currentPeriodEnd && (
             <p className="mt-3 text-sm text-neutral-300">
-              Próxima cobrança / vencimento:{' '}
+              {current.billingMode === 'card_recurring' ? 'Próxima cobrança no cartão' : 'Próxima cobrança / vencimento'}:{' '}
               <span className="font-medium text-gold-light">{formatDate(current.currentPeriodEnd)}</span>
             </p>
+          )}
+
+          {current.billingMode === 'card_recurring' && current.status === 'active' && (
+            <p className="mt-1 text-xs text-neutral-500">💳 Descontado sozinho no seu cartão todo mês (InfinitePay).</p>
+          )}
+          {current.billingMode === 'card_recurring' && current.status === 'pending' && (
+            <div className="mt-3 space-y-2 rounded-md border border-gold/30 bg-gold/5 p-3 text-sm text-gold-light">
+              <p>Aguardando a barbearia confirmar o seu pagamento no cartão. O plano ativa assim que confirmar.</p>
+              {current.recurringLink && (
+                <a href={current.recurringLink} className="block text-xs underline underline-offset-2">
+                  Ainda não pagou? Abrir o link de pagamento
+                </a>
+              )}
+            </div>
+          )}
+          {current.billingMode === 'card_recurring' && current.status === 'past_due' && (
+            <div className="mt-3 space-y-2 rounded-md border border-red-500/40 bg-red-500/5 p-3 text-sm text-red-300">
+              <p>🚨 A cobrança não passou no seu cartão. Os benefícios ficam pausados até regularizar.</p>
+              {current.recurringLink && (
+                <a href={current.recurringLink} className="block">
+                  <Button className="w-full">Cadastrar o cartão de novo</Button>
+                </a>
+              )}
+            </div>
           )}
 
           <div className="mt-3">

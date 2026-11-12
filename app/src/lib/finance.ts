@@ -1,4 +1,4 @@
-import type { Appointment, Expense, Payment } from '../types'
+import type { Appointment, Expense, Payment, CanceledAppointment } from '../types'
 
 export type PeriodKind = 'week' | 'month' | 'year'
 
@@ -110,6 +110,11 @@ export interface FinanceReport {
   byCategory: Row[]
   /** Cada ocorrência de saída no período (as fixas aparecem uma vez por mês). */
   expenseDetails: (DetailRow & { expenseId: string; recurring: boolean })[]
+  /** Horários cancelados no período (só informativo, não mexe nos totais). */
+  canceledCount: number
+  /** Valor avulso que deixou de entrar por causa dos cancelamentos. */
+  canceledValue: number
+  canceledDetails: (DetailRow & { canceledBy: string })[]
 }
 
 /** Datas em que a saída cai dentro do período (fixa = todo mês no mesmo dia, desde a data inicial). */
@@ -155,6 +160,7 @@ export function buildReport(
   payments: Payment[],
   appointments: Appointment[],
   expenses: Expense[] = [],
+  canceled: CanceledAppointment[] = [],
 ): FinanceReport {
   const buckets = emptyBuckets(p)
   const index = new Map(buckets.map((b) => [b.key, b]))
@@ -247,7 +253,21 @@ export function buildReport(
   }
   expenseDetails.sort((a, b) => a.date.getTime() - b.date.getTime())
 
+  const canceledDetails = canceled
+    .map((c) => ({
+      date: c.date.toDate(),
+      client: c.clientName,
+      item: c.serviceName,
+      method: c.usedPlanCredit ? 'Plano' : 'Avulso',
+      amount: c.usedPlanCredit ? 0 : Number(c.price) || 0,
+      canceledBy: c.canceledBy === 'owner' ? 'Barbearia' : 'Cliente',
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+
   return {
+    canceledCount: canceledDetails.length,
+    canceledValue: canceledDetails.reduce((s, c) => s + c.amount, 0),
+    canceledDetails,
     expensesTotal,
     byCategory: [...categories.values()].sort(byTotal),
     expenseDetails,

@@ -304,15 +304,15 @@ export async function ownerBookAppointment(ctx: Ctx) {
 }
 
 /**
- * Horário cancelado → devolve os créditos do plano que ele usou, se o crédito
- * é do mês atual do plano. `creditRefunded` evita devolver duas vezes.
+ * Horário cancelado → devolve os créditos do plano que ele usou (se o crédito é
+ * do mês atual do plano) e APAGA o horário. Fica só um resumo em
+ * `canceledAppointments/{id}`, que aparece no relatório financeiro.
  */
-async function cancelWithRefund(fs: Firestore, appointmentId: string, extra: Data) {
+async function cancelWithRefund(fs: Firestore, appointmentId: string, extra: { canceledBy: 'client' | 'owner' }) {
   return fs.runTransaction(async (tx) => {
     const appt = await tx.get(`appointments/${appointmentId}`)
-    if (!appt) throw new ApiError('not-found', 'Horário não encontrado.')
+    if (!appt) throw new ApiError('not-found', 'Esse horário já foi cancelado.')
     const a = appt.data
-    if (a.status === 'canceled') return { appt: a, creditReturned: false }
 
     let creditReturned = false
     if (a.usedPlanCredit && a.subscriptionId && !a.creditRefunded) {
@@ -334,9 +334,26 @@ async function cancelWithRefund(fs: Firestore, appointmentId: string, extra: Dat
         }
       }
     }
-    tx.update(appt.path, { status: 'canceled', canceledAt: new Date(), creditRefunded: creditReturned, ...extra })
+    tx.create(`canceledAppointments/${appointmentId}`, cancelRecord(a, extra.canceledBy, creditReturned))
+    tx.delete(appt.path)
     return { appt: a, creditReturned }
   })
+}
+
+/** O que sobra de um horário cancelado: só o necessário para o relatório. */
+export function cancelRecord(a: Data, canceledBy: string, creditReturned: boolean, canceledAt = new Date()): Data {
+  return {
+    date: a.date,
+    clientId: a.clientId ?? null,
+    clientName: a.clientName ?? '',
+    serviceName: a.serviceName ?? '',
+    price: Number(a.price) || 0,
+    usedPlanCredit: !!a.usedPlanCredit,
+    creditReturned,
+    bookedBy: a.bookedBy ?? null,
+    canceledBy,
+    canceledAt,
+  }
 }
 
 export async function cancelMyAppointment({ env, fs, uid, data }: Ctx) {

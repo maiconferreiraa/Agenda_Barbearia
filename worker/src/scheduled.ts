@@ -5,6 +5,7 @@ import { notify } from './notify'
 import { SUBSCRIPTION_PAGE, cancelOpenInvoice, createInvoice } from './billing'
 import { DAY_MS, addMonths, brl, formatBr, sp, spDate } from './time'
 import { businessInfo, firstName, queueWhatsapp } from './whatsapp'
+import { CARD_MODE, processCardSubscription } from './api/cardRecurring'
 
 /** Dias antes do vencimento em que a mensalidade é gerada e enviada. */
 const INVOICE_LEAD_DAYS = 5
@@ -104,6 +105,9 @@ async function processSubscription(env: Env, fs: Firestore, doc: Doc, now: Date)
     }
     return false
   }
+
+  // Cartão recorrente da InfinitePay: sem links mensais, a cobrança é no cartão.
+  if (sub.billingMode === CARD_MODE) return processCardSubscription(env, fs, doc, now)
 
   const open = sub.openInvoice as { id: string; checkoutUrl: string } | null | undefined
   const shop = await businessInfo(fs)

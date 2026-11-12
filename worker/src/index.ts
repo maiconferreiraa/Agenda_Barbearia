@@ -24,6 +24,7 @@ import {
 } from './api/plans'
 import { infinitePayWebhook } from './api/webhook'
 import { importSubscription, updateClientPhone } from './api/importSubscription'
+import { confirmCardPayment, markCardRefused } from './api/cardRecurring'
 import { claimUsername, loginWithUsername, usernameAvailable } from './api/username'
 import { runBilling } from './scheduled'
 
@@ -44,6 +45,8 @@ const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
   claimUsername,
   importSubscription,
   updateClientPhone,
+  confirmCardPayment,
+  markCardRefused,
 }
 
 const PUBLIC_ROUTES: Record<string, (env: Env, fs: Firestore, data: Record<string, unknown>) => Promise<unknown>> = {

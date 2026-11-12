@@ -41,6 +41,8 @@ export interface Plan {
   includedServices: PlanIncludedService[]
   price: number
   active: boolean
+  /** Link de cobrança recorrente no cartão, criado pelo dono no app da InfinitePay. */
+  recurringLink?: string | null
   createdAt?: Timestamp
 }
 
@@ -60,6 +62,10 @@ export interface Subscription {
   planPrice: number
   status: SubscriptionStatus
   usage: Record<string, number>
+  /** 'card_recurring' = cobrado sozinho no cartão pela InfinitePay (dono confirma o 1º pagamento). */
+  billingMode?: 'card_recurring'
+  recurringLink?: string | null
+  cardRefusedAt?: Timestamp | null
   /** Mensalidade em aberto (link InfinitePay), se houver. */
   openInvoice?: OpenInvoice | null
   /** Upgrade iniciado esperando o pagamento da diferença. */
@@ -122,6 +128,21 @@ export interface Appointment {
   bookedBy?: 'client' | 'owner'
   notes?: string
   createdAt?: Timestamp
+}
+
+/** Resumo de um horário cancelado (o horário é apagado; isto vai só para o relatório). */
+export interface CanceledAppointment {
+  id: string
+  date: Timestamp
+  clientId?: string | null
+  clientName: string
+  serviceName: string
+  price: number
+  usedPlanCredit?: boolean
+  creditReturned?: boolean
+  bookedBy?: 'client' | 'owner' | 'guest' | null
+  canceledBy: 'client' | 'owner'
+  canceledAt?: Timestamp
 }
 
 export type PaymentStatus = 'approved' | 'pending' | 'rejected' | 'refunded'
