@@ -5,6 +5,7 @@ import { Spinner } from './components/ui/Spinner'
 
 import { Login } from './pages/auth/Login'
 import { Register } from './pages/auth/Register'
+import { GuestBook } from './pages/GuestBook'
 
 import { OwnerLayout } from './components/layout/OwnerLayout'
 import { Dashboard } from './pages/owner/Dashboard'
@@ -35,6 +36,7 @@ export default function App() {
       <Route path="/" element={<Home />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/agendar" element={<GuestBook />} />
 
       <Route
         path="/owner"

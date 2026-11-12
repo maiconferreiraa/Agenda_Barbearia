@@ -45,7 +45,7 @@ export function Plans() {
       .filter((v): v is PlanIncludedService => v !== null)
 
     const payload = {
-      name: String(form.get('name')),
+      name: String(form.get('name')).trim(),
       description: String(form.get('description') || ''),
       price: Number(form.get('price')),
       active: form.get('active') === 'on',

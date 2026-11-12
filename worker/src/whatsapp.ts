@@ -4,6 +4,15 @@ import type { Firestore } from './firestore'
  * Fila de WhatsApp (`whatsappOutbox`): o servidor só grava; a ponte
  * (`ponte-whatsapp/`, num PC ligado) envia pelo número da barbearia.
  */
+/** Celular no formato exigido pelo app: DDD + 9 + 8 dígitos, só números (ex.: 31995012927). */
+export function strictPhoneBr(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const d = raw.trim()
+  return /^[1-9]{2}9\d{8}$/.test(d) ? d : null
+}
+
+export const PHONE_RULE = 'Telefone só com números, DDD + 9 dígitos. Ex.: 31995012927'
+
 export function normalizePhoneBr(raw: unknown): string | null {
   if (typeof raw !== 'string') return null
   let digits = raw.replace(/\D/g, '').replace(/^0+/, '')

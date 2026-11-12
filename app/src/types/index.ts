@@ -11,6 +11,9 @@ export interface UserProfile {
   /** Usuário para entrar sem e-mail (ex.: maicon.ferreira). */
   username?: string
   fcmTokens?: string[]
+  /** Ficha criada pelo dono na importação do sistema antigo (sem login no app). */
+  imported?: boolean
+  hasAccount?: boolean
   createdAt?: Timestamp
 }
 
@@ -102,7 +105,8 @@ export interface AppointmentServiceLine {
 
 export interface Appointment {
   id: string
-  clientId: string
+  /** null = cliente sem cadastro, marcado pelo dono. */
+  clientId: string | null
   clientName: string
   clientPhone?: string
   services: AppointmentServiceLine[]
@@ -114,6 +118,8 @@ export interface Appointment {
   date: Timestamp
   status: AppointmentStatus
   canceledBy?: 'client' | 'owner'
+  /** Quem marcou: o próprio cliente pelo app ou o dono pela agenda. */
+  bookedBy?: 'client' | 'owner'
   notes?: string
   createdAt?: Timestamp
 }
@@ -151,6 +157,7 @@ export type NotificationType =
   | 'plan_canceled'
   | 'invoice_created'
   | 'payment_overdue'
+  | 'whatsapp_failed'
 
 export interface AppNotification {
   id: string

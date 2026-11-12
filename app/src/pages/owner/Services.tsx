@@ -46,7 +46,7 @@ export function Services() {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
     const payload = {
-      name: String(form.get('name')),
+      name: String(form.get('name')).trim(),
       description: String(form.get('description') || ''),
       durationMinutes: Number(form.get('durationMinutes')),
       price: Number(form.get('price')),

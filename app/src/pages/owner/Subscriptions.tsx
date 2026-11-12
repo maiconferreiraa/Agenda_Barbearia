@@ -7,10 +7,12 @@ import { useAllSubscriptions } from '../../hooks/useSubscriptions'
 import { formatCurrency, formatDate } from '../../lib/format'
 import { subscriptionHealth, HEALTH_DOT, HEALTH_TEXT } from '../../lib/subscriptionHealth'
 import { cancelSubscriptionFn } from '../../lib/paymentsApi'
+import { ImportSubscriptionModal } from '../../components/ImportSubscriptionModal'
 
 export function Subscriptions() {
   const { data: subscriptions, loading } = useAllSubscriptions()
   const [canceling, setCanceling] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
 
   async function handleCancel(id: string, clientName: string) {
     if (!confirm(`Cancelar a assinatura de ${clientName}? Não serão geradas novas mensalidades.`))
@@ -32,7 +34,13 @@ export function Subscriptions() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-2xl text-neutral-100">Assinaturas</h1>
+      <ImportSubscriptionModal open={importing} onClose={() => setImporting(false)} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-2xl text-neutral-100">Assinaturas</h1>
+        <Button onClick={() => setImporting(true)} className="!px-3 !py-1.5 text-sm">
+          + Importar do sistema antigo
+        </Button>
+      </div>
 
       {loading && <Spinner full />}
 

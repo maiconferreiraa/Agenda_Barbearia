@@ -1,32 +1,92 @@
 @import "tailwindcss";
 
 @theme {
-  --color-ink: #0b0b0c;
-  --color-ink-soft: #141416;
-  --color-ink-card: #1a1a1d;
-  --color-ink-border: #2a2a2e;
-  --color-gold: #c9a227;
-  --color-gold-light: #f3d27a;
-  --color-gold-dark: #8a6c17;
+  /* Tema claro preto e branco (cores da logo). Os nomes "ink"/"gold" ficaram
+     do tema escuro antigo: ink = fundos, gold = destaque (agora preto). */
+  --color-ink: #ffffff;
+  --color-ink-soft: #f6f6f6;
+  --color-ink-card: #ffffff;
+  --color-ink-border: #e2e2e2;
+  --color-gold: #111111;
+  --color-gold-light: #000000;
+  --color-gold-dark: #555555;
+
+  /* Escala de cinza invertida: "neutral-100" (texto forte) vira quase preto. */
+  --color-neutral-50: #0a0a0a;
+  --color-neutral-100: #111111;
+  --color-neutral-200: #222222;
+  --color-neutral-300: #3a3a3a;
+  --color-neutral-400: #505050;
+  --color-neutral-500: #6b6b6b;
+  --color-neutral-600: #a3a3a3;
+  --color-neutral-700: #d4d4d4;
+  --color-neutral-800: #e5e5e5;
+  --color-neutral-900: #f5f5f5;
+  --color-neutral-950: #fafafa;
+
+  /* Tons claros de aviso ficam escuros pra serem lidos no fundo branco. */
+  --color-red-300: #b91c1c;
+  --color-red-400: #dc2626;
+  --color-red-900: #fecaca;
+  --color-red-950: #fef2f2;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #059669;
+  --color-amber-300: #92400e;
+  --color-amber-400: #b45309;
+  --color-sky-300: #075985;
+  --color-sky-400: #0369a1;
   --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
   --font-sans: "Inter", system-ui, -apple-system, sans-serif;
 }
 
+/* Modo escuro (botão da lua). Troca as mesmas variáveis do tema. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-ink: #0b0b0c;
+  --color-ink-soft: #141416;
+  --color-ink-card: #1a1a1d;
+  --color-ink-border: #2a2a2e;
+  --color-gold: #e5e5e5;
+  --color-gold-light: #ffffff;
+  --color-gold-dark: #8a8a8a;
+  --color-neutral-50: #fafafa;
+  --color-neutral-100: #f5f5f5;
+  --color-neutral-200: #e5e5e5;
+  --color-neutral-300: #d4d4d4;
+  --color-neutral-400: #a3a3a3;
+  --color-neutral-500: #8a8a8a;
+  --color-neutral-600: #525252;
+  --color-neutral-700: #404040;
+  --color-neutral-800: #262626;
+  --color-neutral-900: #171717;
+  --color-neutral-950: #0a0a0a;
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
+  --color-red-900: #7f1d1d;
+  --color-red-950: #450a0a;
+  --color-emerald-300: #6ee7b7;
+  --color-emerald-400: #34d399;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-sky-300: #7dd3fc;
+  --color-sky-400: #38bdf8;
+}
+
 @layer base {
   html {
-    color-scheme: dark;
+    color-scheme: light;
   }
 
   body {
     background-color: var(--color-ink);
-    color: #f2ede3;
+    color: var(--color-neutral-100);
     font-family: var(--font-sans);
     -webkit-tap-highlight-color: transparent;
   }
 
   ::selection {
     background-color: var(--color-gold);
-    color: #0b0b0c;
+    color: #ffffff;
   }
 
   ::-webkit-scrollbar {
@@ -37,7 +97,7 @@
     background: var(--color-ink);
   }
   ::-webkit-scrollbar-thumb {
-    background: var(--color-ink-border);
+    background: var(--color-neutral-700);
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {

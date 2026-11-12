@@ -6,6 +6,39 @@ export const bookAppointmentFn = callApi<
   { appointmentId: string; usedPlanCredit: boolean }
 >('bookAppointment')
 
+/** Dono marca pelo cliente: cadastrado (clientId) ou só nome/telefone; crédito do plano ou avulso. */
+export const ownerBookAppointmentFn = callApi<
+  {
+    clientId?: string
+    clientName?: string
+    clientPhone?: string
+    serviceIds: string[]
+    dateISO: string
+    payMode: 'plan' | 'walk_in'
+  },
+  { appointmentId: string; usedPlanCredit: boolean }
+>('ownerBookAppointment')
+
+// ---------- Sem cadastro (não precisa de login) ----------
+
+export interface PublicService {
+  id: string
+  name: string
+  durationMinutes: number
+  price: number
+}
+
+export const publicServicesFn = callApi<Record<string, never>, { businessName: string; services: PublicService[] }>(
+  'publicServices',
+)
+
+export const publicSlotsFn = callApi<{ serviceIds: string[]; dateISO: string }, { slots: string[] }>('publicSlots')
+
+export const guestBookAppointmentFn = callApi<
+  { name: string; phone: string; serviceIds: string[]; dateISO: string },
+  { appointmentId: string; serviceName: string; price: number; dateISO: string }
+>('guestBookAppointment')
+
 export const getAvailableSlotsFn = callApi<
   { serviceIds: string[]; dateISO: string },
   { slots: string[] }

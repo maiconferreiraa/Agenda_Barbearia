@@ -79,7 +79,7 @@ export async function subscribePlan({ env, fs, uid, data }: Ctx) {
     clientId: uid,
     clientName: user.data.name,
     planId,
-    planName: plan.data.name,
+    planName: String(plan.data.name).trim(),
     planPrice: plan.data.price,
   }
   await fs.create(`subscriptions/${subId}`, {
@@ -105,7 +105,7 @@ export async function subscribePlan({ env, fs, uid, data }: Ctx) {
       targetRole: 'owner',
       relatedId: subId,
       title: 'Novo plano escolhido',
-      message: `${user.data.name} iniciou a assinatura do plano "${plan.data.name}".`,
+      message: `${user.data.name} iniciou a assinatura do plano "${String(plan.data.name).trim()}".`,
     })
     return { checkoutUrl }
   } catch (err) {
@@ -329,8 +329,8 @@ export async function upgradePlan({ env, fs, uid, data }: Ctx) {
     periodStart: now,
     periodEnd: (sub.currentPeriodEnd as Date) ?? now,
     amount: Math.max(diff, 1),
-    description: `Upgrade ${sub.planName} → ${plan.data.name}`,
-    extra: { targetPlanId: planId, targetPlanName: plan.data.name, targetPlanPrice: plan.data.price },
+    description: `Upgrade ${sub.planName} → ${String(plan.data.name).trim()}`,
+    extra: { targetPlanId: planId, targetPlanName: String(plan.data.name).trim(), targetPlanPrice: plan.data.price },
   })
   return { checkoutUrl, amount: Math.max(diff, 1) }
 }

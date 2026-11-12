@@ -2,11 +2,20 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="apple-touch-icon" href="/icons/icon-192.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="theme-color" content="#0b0b0c" />
+    <meta name="theme-color" content="#ffffff" />
     <meta name="description" content="Agenda, planos e assinaturas da Barbearia Prime" />
+    <script>
+      // Aplica o tema salvo antes de desenhar a tela (evita piscar).
+      try {
+        if (localStorage.getItem('tema') === 'escuro') {
+          document.documentElement.dataset.theme = 'dark'
+          document.querySelector('meta[name=theme-color]').content = '#0b0b0c'
+        }
+      } catch (e) {}
+    </script>
     <title>Barbearia Prime</title>
   </head>
   <body>

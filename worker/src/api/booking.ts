@@ -3,7 +3,8 @@ import type { Ctx } from './ctx'
 import { requireOwner } from './ctx'
 import type { Data, Firestore } from '../firestore'
 import { notify } from '../notify'
-import { DAY_MS, formatDateTimeBr, sp, spDate, spDayStart } from '../time'
+import { PHONE_RULE, businessInfo, firstName, queueWhatsapp, strictPhoneBr } from '../whatsapp'
+import { DAY_MS, brl, formatDateTimeBr, sp, spDate, spDayStart } from '../time'
 
 /** Antecedência mínima para o cliente desmarcar sozinho (mesmo valor no app). */
 export const CLIENT_CANCEL_MIN_HOURS = 2
@@ -108,17 +109,29 @@ export async function getAvailableSlots({ fs, data }: Ctx) {
   return { slots }
 }
 
-export async function bookAppointment({ env, fs, uid, data }: Ctx) {
-  const date = new Date(String(data.dateISO))
+interface BookInput {
+  /** null = cliente sem cadastro (marcado pelo dono só com nome/telefone). */
+  clientId: string | null
+  clientName: string
+  clientPhone: string | null
+  serviceIds: unknown
+  date: Date
+  /** 'auto' (cliente): usa crédito quando tiver; 'plan' (dono): exige crédito; 'walk_in': cobra tudo. */
+  payMode: 'auto' | 'plan' | 'walk_in'
+  bookedBy: 'client' | 'owner' | 'guest'
+}
+
+/** Cria o horário numa transação: confere se está livre e desconta crédito do plano. */
+async function createAppointment(fs: Firestore, input: BookInput) {
+  const { date } = input
   if (Number.isNaN(date.getTime()) || date.getTime() < Date.now() - 60_000) {
     throw new ApiError('invalid-argument', 'Horário inválido.')
   }
-  const [user, services] = await Promise.all([fs.get(`users/${uid}`), loadServices(fs, data.serviceIds)])
-  if (!user) throw new ApiError('not-found', 'Usuário não encontrado.')
+  const services = await loadServices(fs, input.serviceIds)
   const totalDuration = services.reduce((s, x) => s + x.durationMinutes, 0)
   const appointmentId = fs.newId()
 
-  const result = await fs.runTransaction(async (tx) => {
+  const appointment = await fs.runTransaction(async (tx) => {
     const dayDocs = await tx.query('appointments', { where: dayRange(date) })
     const start = sp(date).minutes
     const end = start + totalDuration
@@ -126,21 +139,23 @@ export async function bookAppointment({ env, fs, uid, data }: Ctx) {
       throw new ApiError('already-exists', 'Esse horário acabou de ser ocupado. Escolha outro.')
     }
 
-    const subs = await tx.query('subscriptions', {
-      where: [
-        { field: 'clientId', op: '==', value: uid },
-        { field: 'status', op: '==', value: 'active' },
-      ],
-      limit: 1,
-    })
     let subscriptionId: string | null = null
     let included: { serviceId: string; quantity: number }[] = []
     let usage: Record<string, number> = {}
-    if (subs.length > 0) {
-      subscriptionId = subs[0].id
-      usage = (subs[0].data.usage as Record<string, number>) ?? {}
-      const plan = await tx.get(`plans/${subs[0].data.planId}`)
-      included = (plan?.data.includedServices as typeof included) ?? []
+    if (input.clientId && input.payMode !== 'walk_in') {
+      const subs = await tx.query('subscriptions', {
+        where: [
+          { field: 'clientId', op: '==', value: input.clientId },
+          { field: 'status', op: '==', value: 'active' },
+        ],
+        limit: 1,
+      })
+      if (subs.length > 0) {
+        subscriptionId = subs[0].id
+        usage = (subs[0].data.usage as Record<string, number>) ?? {}
+        const plan = await tx.get(`plans/${subs[0].data.planId}`)
+        included = (plan?.data.includedServices as typeof included) ?? []
+      }
     }
 
     const usageUpdates: Data = {}
@@ -151,27 +166,52 @@ export async function bookAppointment({ env, fs, uid, data }: Ctx) {
       if (usedPlanCredit) usageUpdates[`usage.${s.id}`] = used + 1
       return { serviceId: s.id, serviceName: s.name, durationMinutes: s.durationMinutes, price: s.price, usedPlanCredit }
     })
+    const usedPlanCredit = lines.some((l) => l.usedPlanCredit)
+    if (input.payMode === 'plan' && !usedPlanCredit) {
+      throw new ApiError(
+        'failed-precondition',
+        subscriptionId
+          ? 'O plano desse cliente não tem crédito sobrando pra esse serviço. Marque como avulso.'
+          : 'Esse cliente não tem plano ativo. Marque como avulso.',
+      )
+    }
     if (subscriptionId && Object.keys(usageUpdates).length > 0) {
       tx.update(`subscriptions/${subscriptionId}`, usageUpdates)
     }
 
-    const usedPlanCredit = lines.some((l) => l.usedPlanCredit)
-    const appointment = {
-      clientId: uid,
-      clientName: user.data.name,
-      clientPhone: user.data.phone ?? null,
+    const appt = {
+      clientId: input.clientId,
+      clientName: input.clientName,
+      clientPhone: input.clientPhone,
       services: lines,
       serviceName: lines.map((l) => l.serviceName).join(' + '),
       durationMinutes: totalDuration,
       price: lines.filter((l) => !l.usedPlanCredit).reduce((s, l) => s + l.price, 0),
-      subscriptionId,
+      subscriptionId: usedPlanCredit ? subscriptionId : null,
       usedPlanCredit,
       date,
       status: 'scheduled',
+      bookedBy: input.bookedBy,
       createdAt: new Date(),
     }
-    tx.create(`appointments/${appointmentId}`, appointment)
-    return appointment
+    tx.create(`appointments/${appointmentId}`, appt)
+    return appt
+  })
+  return { appointmentId, appointment }
+}
+
+export async function bookAppointment({ env, fs, uid, data }: Ctx) {
+  const user = await fs.get(`users/${uid}`)
+  if (!user) throw new ApiError('not-found', 'Usuário não encontrado.')
+  const date = new Date(String(data.dateISO))
+  const { appointmentId, appointment } = await createAppointment(fs, {
+    clientId: uid,
+    clientName: String(user.data.name ?? 'Cliente'),
+    clientPhone: (user.data.phone as string | undefined) ?? null,
+    serviceIds: data.serviceIds,
+    date,
+    payMode: 'auto',
+    bookedBy: 'client',
   })
 
   await notify(env, fs, {
@@ -179,9 +219,88 @@ export async function bookAppointment({ env, fs, uid, data }: Ctx) {
     targetRole: 'owner',
     relatedId: appointmentId,
     title: 'Novo agendamento',
-    message: `${result.clientName} agendou ${result.serviceName} em ${formatDateTimeBr(date)}.`,
+    message: `${appointment.clientName} agendou ${appointment.serviceName} em ${formatDateTimeBr(date)}.`,
   })
-  return { appointmentId, usedPlanCredit: result.usedPlanCredit }
+  return { appointmentId, usedPlanCredit: appointment.usedPlanCredit }
+}
+
+async function confirmByWhatsapp(
+  fs: Firestore,
+  appointmentId: string,
+  clientName: string,
+  phone: string,
+  appointment: { serviceName: string; usedPlanCredit: boolean; price: number; date: Date },
+) {
+  const { name } = await businessInfo(fs)
+  await queueWhatsapp(fs, {
+    phone,
+    kind: 'appointment_booked',
+    relatedId: appointmentId,
+    text:
+      `✂️ Olá, ${firstName(clientName)}! Seu horário na ${name} está marcado:\n` +
+      `*${appointment.serviceName}* — ${formatDateTimeBr(appointment.date)}.` +
+      (appointment.usedPlanCredit
+        ? '\nUsando crédito do seu plano.'
+        : `\nValor: ${brl(appointment.price)} (pago na barbearia).`) +
+      '\n\nSe não puder vir, avise com antecedência. Até lá!',
+  })
+}
+
+/**
+ * Dono marca pelo cliente (balcão/telefone). `clientId` de um cliente cadastrado
+ * ou `clientName` (+ telefone) para quem não tem conta. `payMode`: 'plan' ou 'walk_in'.
+ */
+export async function ownerBookAppointment(ctx: Ctx) {
+  const { env, fs, data } = ctx
+  await requireOwner(ctx)
+  const payMode = data.payMode === 'plan' ? 'plan' : 'walk_in'
+  const date = new Date(String(data.dateISO))
+
+  let clientId: string | null = null
+  let clientName = typeof data.clientName === 'string' ? data.clientName.trim().slice(0, 80) : ''
+  let clientPhone: string | null = null
+  if (typeof data.clientPhone === 'string' && data.clientPhone.trim()) {
+    clientPhone = strictPhoneBr(data.clientPhone)
+    if (!clientPhone) throw new ApiError('invalid-argument', PHONE_RULE)
+  }
+
+  if (typeof data.clientId === 'string' && data.clientId) {
+    if (data.clientId.includes('/')) throw new ApiError('invalid-argument', 'Cliente inválido.')
+    const user = await fs.get(`users/${data.clientId}`)
+    if (!user) throw new ApiError('not-found', 'Cliente não encontrado.')
+    clientId = data.clientId
+    clientName = String(user.data.name ?? 'Cliente')
+    clientPhone = (user.data.phone as string | undefined) ?? clientPhone
+  } else if (!clientName) {
+    throw new ApiError('invalid-argument', 'Escolha o cliente ou digite o nome dele.')
+  } else if (payMode === 'plan') {
+    throw new ApiError('failed-precondition', 'Cliente sem cadastro não tem plano. Marque como avulso.')
+  }
+
+  const { appointmentId, appointment } = await createAppointment(fs, {
+    clientId,
+    clientName,
+    clientPhone,
+    serviceIds: data.serviceIds,
+    date,
+    payMode,
+    bookedBy: 'owner',
+  })
+
+  // Avisa o cliente (no app, se tiver conta, e no WhatsApp, se tiver número).
+  const when = formatDateTimeBr(date)
+  if (clientId) {
+    await notify(env, fs, {
+      type: 'appointment_new',
+      targetUserId: clientId,
+      relatedId: appointmentId,
+      link: '/app/appointments',
+      title: 'Horário marcado pela barbearia',
+      message: `${appointment.serviceName} em ${when}.` + (appointment.usedPlanCredit ? ' Usando crédito do seu plano.' : ''),
+    })
+  }
+  if (clientPhone) await confirmByWhatsapp(fs, appointmentId, clientName, clientPhone, appointment)
+  return { appointmentId, usedPlanCredit: appointment.usedPlanCredit }
 }
 
 /**
@@ -281,4 +400,71 @@ export async function setAppointmentStatus(ctx: Ctx) {
   }
   await fs.update(doc.path, { status })
   return { ok: true, creditReturned: false }
+}
+
+// ---------- Sem cadastro (rotas sem login) ----------
+
+/** Máximo de horários futuros marcados sem cadastro por telefone (evita trote). */
+const GUEST_MAX_UPCOMING = 2
+
+/** POST /api/publicServices — serviços ativos para a página "Agendar sem cadastro". */
+export async function publicServices(fs: Firestore) {
+  const docs = await fs.query('services', { where: [{ field: 'active', op: '==', value: true }] })
+  const { name } = await businessInfo(fs)
+  return {
+    businessName: name,
+    services: docs
+      .map((d) => ({
+        id: d.id,
+        name: String(d.data.name),
+        durationMinutes: Number(d.data.durationMinutes),
+        price: Number(d.data.price),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+  }
+}
+
+/** POST /api/publicSlots { serviceIds, dateISO } — mesmos horários livres do app. */
+export async function publicSlots(env: Ctx['env'], fs: Firestore, data: Data) {
+  return getAvailableSlots({ env, fs, uid: '', data })
+}
+
+/** POST /api/guestBookAppointment { name, phone, serviceIds, dateISO } — avulso, sem conta. */
+export async function guestBookAppointment(env: Ctx['env'], fs: Firestore, data: Data) {
+  const name = typeof data.name === 'string' ? data.name.trim().replace(/\s+/g, ' ').slice(0, 80) : ''
+  if (name.length < 2) throw new ApiError('invalid-argument', 'Digite seu nome.')
+  const phone = strictPhoneBr(data.phone)
+  if (!phone) throw new ApiError('invalid-argument', PHONE_RULE)
+
+  const mine = await fs.query('appointments', { where: [{ field: 'clientPhone', op: '==', value: phone }], limit: 30 })
+  const upcoming = mine.filter(
+    (d) => ['scheduled', 'confirmed'].includes(String(d.data.status)) && (d.data.date as Date).getTime() > Date.now(),
+  )
+  if (upcoming.length >= GUEST_MAX_UPCOMING) {
+    throw new ApiError(
+      'failed-precondition',
+      `Esse telefone já tem ${upcoming.length} horários marcados. Para marcar mais, fale com a barbearia ou crie sua conta.`,
+    )
+  }
+
+  const date = new Date(String(data.dateISO))
+  const { appointmentId, appointment } = await createAppointment(fs, {
+    clientId: null,
+    clientName: name,
+    clientPhone: phone,
+    serviceIds: data.serviceIds,
+    date,
+    payMode: 'walk_in',
+    bookedBy: 'guest',
+  })
+
+  await notify(env, fs, {
+    type: 'appointment_new',
+    targetRole: 'owner',
+    relatedId: appointmentId,
+    title: 'Novo agendamento (sem cadastro)',
+    message: `${name} (${phone}) agendou ${appointment.serviceName} em ${formatDateTimeBr(date)}.`,
+  })
+  await confirmByWhatsapp(fs, appointmentId, name, phone, appointment)
+  return { appointmentId, serviceName: appointment.serviceName, price: appointment.price, dateISO: date.toISOString() }
 }

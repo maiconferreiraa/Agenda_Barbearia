@@ -17,6 +17,7 @@ const ICONS: Record<AppNotification['type'], string> = {
   plan_canceled: '🛑',
   invoice_created: '🧾',
   payment_overdue: '🚨',
+  whatsapp_failed: '📵',
 }
 
 export function NotificationBell() {

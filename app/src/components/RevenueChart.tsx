@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { formatCurrency } from '../lib/format'
 import type { Bucket } from '../lib/finance'
 
-/** Cores validadas (contraste ≥ 3:1 e daltonismo) no fundo escuro do app. */
+/** Cores validadas (contraste ≥ 3:1 e daltonismo) no fundo branco do app. */
 export const SERIES = {
   plans: { label: 'Mensalidades', color: '#3987e5' },
   walkIn: { label: 'Avulsos', color: '#d95926' },
@@ -105,8 +105,8 @@ export function RevenueChart({ buckets }: { buckets: Bucket[] }) {
           <svg width={width} height={HEIGHT} role="img" aria-label="Receita por período: mensalidades e avulsos">
             {ticks.map((t) => (
               <g key={t}>
-                <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} stroke="#2a2a2e" strokeWidth={1} />
-                <text x={PAD.left - 6} y={y(t) + 3} textAnchor="end" fontSize={10} fill="#8a8a90">
+                <line x1={PAD.left} x2={width - PAD.right} y1={y(t)} y2={y(t)} className="stroke-ink-border" strokeWidth={1} />
+                <text x={PAD.left - 6} y={y(t) + 3} textAnchor="end" fontSize={10} className="fill-neutral-500">
                   {compactBRL(t, max)}
                 </text>
               </g>
@@ -128,7 +128,7 @@ export function RevenueChart({ buckets }: { buckets: Bucket[] }) {
                     fill={SERIES.walkIn.color}
                   />
                   {i % labelEvery === 0 && (
-                    <text x={cx} y={HEIGHT - 8} textAnchor="middle" fontSize={10} fill="#8a8a90">
+                    <text x={cx} y={HEIGHT - 8} textAnchor="middle" fontSize={10} className="fill-neutral-500">
                       {b.label}
                     </text>
                   )}

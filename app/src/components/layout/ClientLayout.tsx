@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import clsx from 'clsx'
 import { Logo } from '../Logo'
 import { NotificationBell } from '../NotificationBell'
+import { ThemeToggle } from '../ThemeToggle'
 import { EnablePush } from '../EnablePush'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -20,6 +21,7 @@ export function ClientLayout() {
       <header className="flex items-center justify-between border-b border-ink-border bg-ink-soft px-4 py-3">
         <Logo size="sm" />
         <div className="flex items-center gap-2">
+          <ThemeToggle />
           <NotificationBell />
           <button
             onClick={logout}

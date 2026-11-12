@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import clsx from 'clsx'
 import { Logo } from '../Logo'
 import { NotificationBell } from '../NotificationBell'
+import { ThemeToggle } from '../ThemeToggle'
 import { EnablePush } from '../EnablePush'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -68,10 +69,16 @@ export function OwnerLayout() {
       <div className="flex min-h-screen flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-ink-border bg-ink-soft px-4 py-3 md:hidden">
           <Logo size="sm" />
-          <NotificationBell />
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <NotificationBell />
+          </div>
         </header>
         <header className="hidden items-center justify-end border-b border-ink-border bg-ink-soft px-6 py-3 md:flex">
-          <NotificationBell />
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
+            <NotificationBell />
+          </div>
         </header>
 
         <EnablePush />

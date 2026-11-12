@@ -1,34 +1,20 @@
 import clsx from 'clsx'
+import logo from '../assets/logo.jpg'
 
+/** Logo oficial da barbearia (placa escura com "Prime"), igual nos dois temas. */
 export function Logo({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   return (
-    <div className="flex items-center gap-2.5">
-      <img
-        src="/favicon.svg"
-        alt="Barbearia Prime"
-        className={clsx(
-          size === 'sm' && 'h-7 w-7',
-          size === 'md' && 'h-9 w-9',
-          size === 'lg' && 'h-14 w-14',
-        )}
-      />
-      <div className="leading-tight">
-        <p
-          className={clsx(
-            'font-display tracking-wide text-gold-light',
-            size === 'sm' && 'text-base',
-            size === 'md' && 'text-lg',
-            size === 'lg' && 'text-2xl',
-          )}
-        >
-          Barbearia Prime
-        </p>
-        {size !== 'sm' && (
-          <p className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">
-            Estilo &amp; Tradição
-          </p>
-        )}
-      </div>
-    </div>
+    <img
+      src={logo}
+      alt="Barbearia Prime"
+      width={720}
+      height={344}
+      className={clsx(
+        'w-auto rounded-md',
+        size === 'sm' && 'h-9',
+        size === 'md' && 'h-14',
+        size === 'lg' && 'h-28 rounded-xl shadow-md',
+      )}
+    />
   )
 }

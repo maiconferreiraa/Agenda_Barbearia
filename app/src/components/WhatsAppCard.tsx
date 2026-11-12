@@ -4,8 +4,9 @@ import QRCode from 'qrcode'
 import { db } from '../firebase'
 import { Card } from './ui/Card'
 import { Button } from './ui/Button'
-import { Input } from './ui/Field'
 import { useBusinessSettings } from '../hooks/useBusinessSettings'
+import { PhoneInput } from './ui/PhoneInput'
+import { cleanPhone, isValidPhone } from '../lib/phone'
 
 interface WhatsAppState {
   status?: 'qr' | 'connected' | 'disconnected'
@@ -44,7 +45,7 @@ export function WhatsAppCard() {
   const [requesting, setRequesting] = useState(false)
 
   useEffect(() => {
-    if (!pairPhone && settings.phone) setPairPhone(settings.phone)
+    if (!pairPhone && settings.phone) setPairPhone(cleanPhone(settings.phone))
   }, [settings.phone, pairPhone])
 
   // Chegou o código (ou erro): para de esperar.
@@ -135,15 +136,9 @@ export function WhatsAppCard() {
             <div className="space-y-3">
               {!state.pairingCode ? (
                 <>
-                  <Input
-                    label="Número do WhatsApp da barbearia"
-                    inputMode="tel"
-                    placeholder="(31) 99999-9999"
-                    value={pairPhone}
-                    onChange={(e) => setPairPhone(e.target.value)}
-                  />
+                  <PhoneInput label="Número do WhatsApp da barbearia" value={pairPhone} onChange={setPairPhone} />
                   {state.pairingError && <p className="text-sm text-red-400">{state.pairingError}</p>}
-                  <Button className="w-full" loading={requesting} onClick={handleRequestCode}>
+                  <Button className="w-full" loading={requesting} disabled={!isValidPhone(pairPhone)} onClick={handleRequestCode}>
                     Gerar código
                   </Button>
                 </>

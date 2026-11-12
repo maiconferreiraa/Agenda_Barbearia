@@ -2,9 +2,12 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Logo } from '../../components/Logo'
+import { ThemeToggle } from '../../components/ThemeToggle'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Field'
 import { PasswordInput } from '../../components/ui/PasswordInput'
+import { PhoneInput } from '../../components/ui/PhoneInput'
+import { PHONE_RULE, isValidPhone } from '../../lib/phone'
 import { USERNAME_RULE, suggestUsername, usernameAvailableFn } from '../../lib/bookingApi'
 
 type UsernameState = 'idle' | 'checking' | 'free' | 'taken' | 'invalid'
@@ -47,6 +50,7 @@ export function Register() {
     setError('')
     setLoading(true)
     try {
+      if (!isValidPhone(phone)) throw new Error(`Telefone inválido. ${PHONE_RULE}`)
       if (usernameState === 'taken') throw new Error('Esse usuário já existe. Escolha outro.')
       if (usernameState === 'invalid') throw new Error('Usuário inválido: use letras, números, ponto ou _ (3 a 30).')
       await register({ name, email, phone, password, inviteCode, username: username.trim() || undefined })
@@ -71,7 +75,8 @@ export function Register() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink px-4 py-10">
+    <div className="relative flex min-h-screen items-center justify-center bg-ink px-4 py-10">
+      <ThemeToggle className="absolute right-3 top-3" />
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
           <Logo size="lg" />
@@ -114,13 +119,7 @@ export function Register() {
               {usernameState === 'idle' && 'Você vai poder entrar com o usuário ou com o e-mail.'}
             </p>
           </div>
-          <Input
-            label="Telefone / WhatsApp"
-            required
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="(11) 91234-5678"
-          />
+          <PhoneInput required value={phone} onChange={setPhone} />
           <PasswordInput
             label="Senha"
             autoComplete="new-password"

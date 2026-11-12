@@ -9,6 +9,7 @@ import { appointmentPaymentLabel, formatTime } from '../../lib/format'
 import { useBusinessSettings } from '../../hooks/useBusinessSettings'
 import { weekdayKeyFor } from '../../lib/schedule'
 import type { Appointment, AppointmentStatus } from '../../types'
+import { OwnerBookModal } from '../../components/OwnerBookModal'
 
 function toMinutes(time: string) {
   const [h, m] = time.split(':').map(Number)
@@ -73,6 +74,7 @@ const NEXT_STATUS: Partial<Record<AppointmentStatus, { label: string; to: Appoin
 
 export function Agenda() {
   const [day, setDay] = useState(() => startOfDay(new Date()))
+  const [booking, setBooking] = useState(false)
   const { data: appointments, loading } = useAppointmentsRange(day, endOfDay(day))
   const { settings } = useBusinessSettings()
   const dayHours = settings.hours[weekdayKeyFor(day)]
@@ -92,9 +94,13 @@ export function Agenda() {
 
   return (
     <div className="space-y-4">
+      <OwnerBookModal open={booking} onClose={() => setBooking(false)} day={day} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-2xl text-neutral-100">Agenda</h1>
         <div className="flex items-center gap-2">
+          <Button onClick={() => setBooking(true)} className="!px-3 !py-1.5 text-sm">
+            + Marcar horário
+          </Button>
           <Button variant="secondary" aria-label="Dia anterior" onClick={() => setDay(addDays(day, -1))} className="!px-3 !py-1.5">
             ‹
           </Button>
@@ -142,9 +148,13 @@ export function Agenda() {
                       Ocupado — continuação de {slot.continuing.clientName} ({formatTime(slot.continuing.date)})
                     </div>
                   ) : (
-                    <div className="rounded-lg border border-dashed border-ink-border px-3 py-2.5 text-xs text-emerald-400/80">
-                      Livre
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setBooking(true)}
+                      className="w-full rounded-lg border border-dashed border-ink-border px-3 py-2.5 text-left text-xs text-emerald-400/80 hover:border-gold-dark"
+                    >
+                      Livre <span className="text-neutral-500">· toque para marcar</span>
+                    </button>
                   ))}
               </div>
             </div>

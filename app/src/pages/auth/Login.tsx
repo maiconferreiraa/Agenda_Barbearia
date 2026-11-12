@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Logo } from '../../components/Logo'
+import { ThemeToggle } from '../../components/ThemeToggle'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Field'
 import { PasswordInput } from '../../components/ui/PasswordInput'
@@ -30,7 +31,8 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink px-4">
+    <div className="relative flex min-h-screen items-center justify-center bg-ink px-4">
+      <ThemeToggle className="absolute right-3 top-3" />
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
           <Logo size="lg" />
@@ -67,6 +69,13 @@ export function Login() {
             </Link>
           </p>
         </form>
+        <Link
+          to="/agendar"
+          className="mt-4 block rounded-2xl border border-ink-border bg-ink-card/50 p-4 text-center hover:border-gold-dark"
+        >
+          <p className="text-sm font-medium text-neutral-100">Só quer marcar um horário?</p>
+          <p className="text-xs text-neutral-500">Agende sem cadastro, só com nome e telefone →</p>
+        </Link>
       </div>
     </div>
   )

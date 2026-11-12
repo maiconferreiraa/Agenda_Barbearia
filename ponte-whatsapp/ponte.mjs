@@ -83,6 +83,26 @@ function contarEnvio() {
   fs.writeFileSync(CONTAGEM_PATH, JSON.stringify({ dia: hojeSP(), total: enviadosHoje() + 1 }))
 }
 
+/** Mostra no sininho do dono que um aviso não saiu, pra ele corrigir o telefone do cliente. */
+async function avisarDonoFalha(msg, motivo) {
+  const numero = String(msg.to ?? '').replace(/^55/, '')
+  try {
+    await db.collection('notifications').add({
+      type: 'whatsapp_failed',
+      title: '📵 WhatsApp não enviado',
+      message: `A mensagem para ${numero} ${motivo}. Confira o telefone do cliente em Clientes.`,
+      relatedId: msg.relatedId ?? null,
+      targetRole: 'owner',
+      targetUserId: null,
+      link: '/owner/clients',
+      read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    })
+  } catch (err) {
+    log('não consegui avisar o dono da falha:', err.message)
+  }
+}
+
 async function processarFila() {
   const hora = horaSaoPaulo()
   if (hora < HORA_INICIO || hora >= HORA_FIM) return
@@ -132,6 +152,7 @@ async function processarFila() {
     if (resultado === 'sem_whatsapp') {
       await doc.ref.update({ status: 'failed', lastError: 'número sem WhatsApp' })
       log('número sem WhatsApp:', doc.id, msg.to.slice(0, 6) + '…')
+      await avisarDonoFalha(msg, 'esse número não tem WhatsApp')
       continue
     }
 
@@ -141,6 +162,7 @@ async function processarFila() {
       lastError: resultado,
       ...(tentativas >= MAX_TENTATIVAS ? { status: 'failed' } : {}),
     })
+    if (tentativas >= MAX_TENTATIVAS) await avisarDonoFalha(msg, 'não foi entregue depois de 3 tentativas')
     log(`falha (${tentativas}/${MAX_TENTATIVAS}):`, doc.id, resultado)
   }
 }

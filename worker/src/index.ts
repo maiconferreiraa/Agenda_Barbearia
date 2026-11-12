@@ -4,7 +4,16 @@ import { budget } from './google'
 import { requireUid } from './auth'
 import type { Ctx } from './api/ctx'
 import { claimOwnerRole } from './api/account'
-import { bookAppointment, cancelMyAppointment, getAvailableSlots, setAppointmentStatus } from './api/booking'
+import {
+  bookAppointment,
+  cancelMyAppointment,
+  getAvailableSlots,
+  guestBookAppointment,
+  ownerBookAppointment,
+  publicServices,
+  publicSlots,
+  setAppointmentStatus,
+} from './api/booking'
 import {
   cancelMyPlan,
   cancelSubscription,
@@ -14,6 +23,7 @@ import {
   subscribePlan,
 } from './api/plans'
 import { infinitePayWebhook } from './api/webhook'
+import { importSubscription, updateClientPhone } from './api/importSubscription'
 import { claimUsername, loginWithUsername, usernameAvailable } from './api/username'
 import { runBilling } from './scheduled'
 
@@ -22,6 +32,7 @@ const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
   claimOwnerRole,
   getAvailableSlots,
   bookAppointment,
+  ownerBookAppointment,
   cancelMyAppointment,
   setAppointmentStatus,
   subscribePlan,
@@ -31,6 +42,16 @@ const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
   cancelMyPlan,
   upgradePlan,
   claimUsername,
+  importSubscription,
+  updateClientPhone,
+}
+
+const PUBLIC_ROUTES: Record<string, (env: Env, fs: Firestore, data: Record<string, unknown>) => Promise<unknown>> = {
+  usernameAvailable: (_env, fs, data) => usernameAvailable(fs, data),
+  loginWithUsername,
+  publicServices: (_env, fs) => publicServices(fs),
+  publicSlots,
+  guestBookAppointment,
 }
 
 function json(body: unknown, status = 200) {
@@ -44,13 +65,13 @@ async function handleApi(request: Request, env: Env, name: string): Promise<Resp
   budget.used = 0
   if (name === 'infinitepay-webhook') return infinitePayWebhook(request, env)
 
-  // Rotas sem login (antes de entrar): usuário livre? / entrar com usuário.
-  if (name === 'usernameAvailable' || name === 'loginWithUsername') {
+  // Rotas sem login: usuário livre?, entrar com usuário e agendar sem cadastro.
+  const open = PUBLIC_ROUTES[name]
+  if (open) {
     if (request.method !== 'POST') return json({ error: { code: 'invalid-argument', message: 'Use POST.' } }, 405)
     try {
       const data = ((await request.json().catch(() => ({}))) ?? {}) as Record<string, unknown>
-      const fs = new Firestore(env)
-      const result = name === 'usernameAvailable' ? await usernameAvailable(fs, data) : await loginWithUsername(env, fs, data)
+      const result = await open(env, new Firestore(env), data)
       return json({ result })
     } catch (err) {
       if (err instanceof ApiError) return json({ error: { code: err.code, message: err.message } }, HTTP_STATUS[err.code])

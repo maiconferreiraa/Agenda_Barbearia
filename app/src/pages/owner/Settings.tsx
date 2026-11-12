@@ -20,6 +20,9 @@ function timeOptions(current: string) {
   return list.sort()
 }
 
+import { PhoneInput } from '../../components/ui/PhoneInput'
+import { cleanPhone } from '../../lib/phone'
+
 export function Settings() {
   const { settings, loading } = useBusinessSettings()
   const [form, setForm] = useState<BusinessSettings>(settings)
@@ -27,7 +30,7 @@ export function Settings() {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    if (!loading) setForm(settings)
+    if (!loading) setForm({ ...settings, phone: cleanPhone(settings.phone) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading])
 
@@ -64,11 +67,7 @@ export function Settings() {
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
           />
           <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Telefone / WhatsApp"
-              value={form.phone}
-              onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-            />
+            <PhoneInput value={form.phone ?? ''} onChange={(phone) => setForm((f) => ({ ...f, phone }))} />
             <Input
               label="Duração do horário (min)"
               type="number"
