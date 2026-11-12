@@ -110,6 +110,8 @@ export interface FinanceReport {
   byCategory: Row[]
   /** Cada ocorrência de saída no período (as fixas aparecem uma vez por mês). */
   expenseDetails: (DetailRow & { expenseId: string; recurring: boolean })[]
+  /** Taxas da InfinitePay estimadas nos pagamentos de mensalidade (Pix/cartão). */
+  feesTotal: number
   /** Horários cancelados no período (só informativo, não mexe nos totais). */
   canceledCount: number
   /** Valor avulso que deixou de entrar por causa dos cancelamentos. */
@@ -161,7 +163,9 @@ export function buildReport(
   appointments: Appointment[],
   expenses: Expense[] = [],
   canceled: CanceledAppointment[] = [],
+  fees: { pix?: number; card?: number } = {},
 ): FinanceReport {
+  let feesTotal = 0
   const buckets = emptyBuckets(p)
   const index = new Map(buckets.map((b) => [b.key, b]))
   const plans = new Map<string, Row>()
@@ -184,6 +188,10 @@ export function buildReport(
     const amount = Number(pay.amount) || 0
     plansTotal += amount
     plansCount++
+    // A API não informa a taxa: usa a % que o dono cadastrou para Pix ou cartão.
+    // Taxa repassada ao cliente: a barbearia já recebe o valor cheio, sem desconto.
+    const rate = pay.feePassedToClient ? 0 : pay.captureMethod === 'pix' ? fees.pix : fees.card
+    if (rate && rate > 0) feesTotal += Math.round(amount * rate) / 100
     addRow(plans, planNameOf(pay), amount)
     paymentDetails.push({
       date: when,
@@ -265,6 +273,7 @@ export function buildReport(
     .sort((a, b) => a.date.getTime() - b.date.getTime())
 
   return {
+    feesTotal: Math.round(feesTotal * 100) / 100,
     canceledCount: canceledDetails.length,
     canceledValue: canceledDetails.reduce((s, c) => s + c.amount, 0),
     canceledDetails,

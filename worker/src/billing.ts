@@ -120,6 +120,11 @@ export async function markInvoicePaid(
     const sub = (await tx.get(subPath))?.data
     const wasCanceled = inv.status === 'canceled' || !sub || sub.status === 'canceled'
     const amount = payment.paidAmount ?? Number(inv.amount)
+    // Taxa repassada ao cliente (configuração da conta InfinitePay): ele paga a mais
+    // e a barbearia recebe o valor da mensalidade. O relatório conta o valor da mensalidade.
+    const charged = Number(inv.amount)
+    const feePassedToClient = amount > charged + 0.005
+    const reportAmount = feePassedToClient ? charged : amount
 
     tx.update(`invoices/${invoiceId}`, {
       status: 'paid',
@@ -136,7 +141,10 @@ export async function markInvoicePaid(
       invoiceId,
       clientId: inv.clientId,
       clientName: inv.clientName,
-      amount,
+      amount: reportAmount,
+      paidByClient: amount,
+      feePassedToClient,
+      installments: payment.installments,
       status: 'approved',
       transactionNsu: payment.transactionNsu,
       captureMethod: payment.captureMethod,

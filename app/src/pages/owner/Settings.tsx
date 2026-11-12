@@ -23,11 +23,20 @@ function timeOptions(current: string) {
 import { PhoneInput } from '../../components/ui/PhoneInput'
 import { cleanPhone } from '../../lib/phone'
 
+import { saveFeeSettings, useFeeSettings } from '../../hooks/useFeeSettings'
+import type { FeeSettings } from '../../types'
+
 export function Settings() {
   const { settings, loading } = useBusinessSettings()
   const [form, setForm] = useState<BusinessSettings>(settings)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const { fees: savedFees, loading: loadingFees } = useFeeSettings()
+  const [fees, setFees] = useState<FeeSettings>({})
+  useEffect(() => {
+    if (!loadingFees) setFees(savedFees)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingFees])
 
   useEffect(() => {
     if (!loading) setForm({ ...settings, phone: cleanPhone(settings.phone) })
@@ -42,7 +51,10 @@ export function Settings() {
     e.preventDefault()
     setSaving(true)
     try {
-      await setDoc(doc(db, 'businessSettings', 'main'), form, { merge: true })
+      await Promise.all([
+        setDoc(doc(db, 'businessSettings', 'main'), form, { merge: true }),
+        saveFeeSettings(fees),
+      ])
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
     } finally {
@@ -99,6 +111,46 @@ export function Settings() {
             onChange={(e) => setForm((f) => ({ ...f, retentionOffer: e.target.value }))}
             hint="Deixe vazio para oferecer só 'uma condição especial', sem dizer qual."
           />
+        </Card>
+
+        <Card className="space-y-3">
+          <h2 className="font-display text-base text-gold-light">Taxas da InfinitePay</h2>
+          <p className="text-sm text-neutral-400">
+            🔒 Só você vê. A InfinitePay desconta a taxa antes de depositar, mas não informa ao sistema quanto foi.
+            Copie as suas taxas do app da InfinitePay para o relatório mostrar o valor líquido (o que cai na conta).
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Taxa no Pix (%)"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              max={20}
+              step={0.01}
+              placeholder="0"
+              value={fees.feePixPercent ?? ''}
+              onChange={(e) =>
+                setFees((f) => ({ ...f, feePixPercent: e.target.value === '' ? undefined : Number(e.target.value) }))
+              }
+            />
+            <Input
+              label="Taxa no cartão à vista (%)"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              max={20}
+              step={0.01}
+              placeholder="Ex.: 3,15"
+              value={fees.feeCardPercent ?? ''}
+              onChange={(e) =>
+                setFees((f) => ({ ...f, feeCardPercent: e.target.value === '' ? undefined : Number(e.target.value) }))
+              }
+            />
+          </div>
+          <p className="text-xs text-neutral-500">
+            Vale para as mensalidades pagas pelo sistema (link mensal e cartão recorrente). É uma estimativa: o valor
+            exato de cada pagamento fica no app da InfinitePay.
+          </p>
         </Card>
 
         <Card className="space-y-3">

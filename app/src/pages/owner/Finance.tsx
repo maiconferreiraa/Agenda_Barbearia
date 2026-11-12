@@ -11,6 +11,7 @@ import { ExpensesCard } from '../../components/ExpensesCard'
 import { buildReport, periodFor, type PeriodKind, type Row } from '../../lib/finance'
 import { formatCurrency } from '../../lib/format'
 import { exportCsv, exportPdf } from '../../lib/financeExport'
+import { useFeeSettings } from '../../hooks/useFeeSettings'
 import { useBusinessSettings } from '../../hooks/useBusinessSettings'
 import { Button } from '../../components/ui/Button'
 
@@ -59,14 +60,20 @@ export function Finance() {
   const { data: appointments, loading: loadingAppt } = useAppointmentsRange(period.start, period.end)
   const { data: expenses, loading: loadingExp } = useExpenses()
   const { data: canceled } = useCanceledRange(period.start, period.end)
+  const { settings } = useBusinessSettings()
+  const { fees } = useFeeSettings()
   const report = useMemo(
-    () => buildReport(period, payments, appointments, expenses, canceled),
-    [period, payments, appointments, expenses, canceled],
+    () =>
+      buildReport(period, payments, appointments, expenses, canceled, {
+        pix: fees.feePixPercent ?? undefined,
+        card: fees.feeCardPercent ?? undefined,
+      }),
+    [period, payments, appointments, expenses, canceled, fees.feePixPercent, fees.feeCardPercent],
   )
   const total = report.plansTotal + report.walkInTotal
   const loading = loadingPay || loadingAppt || loadingExp
-  const profit = total - report.expensesTotal
-  const { settings } = useBusinessSettings()
+  const profit = total - report.feesTotal - report.expensesTotal
+  const feesConfigured = !!(fees.feePixPercent || fees.feeCardPercent)
   const [exporting, setExporting] = useState(false)
 
   async function handlePdf() {
@@ -134,6 +141,12 @@ export function Finance() {
             <Card>
               <p className="text-xs text-neutral-500">Entradas</p>
               <p className="mt-1 font-display text-lg text-emerald-300 tabular-nums md:text-2xl">{formatCurrency(total)}</p>
+              {report.feesTotal > 0 && (
+                <p className="mt-0.5 text-[11px] leading-tight text-neutral-500">
+                  − {formatCurrency(report.feesTotal)} taxas
+                  <br />= {formatCurrency(total - report.feesTotal)} líquido
+                </p>
+              )}
             </Card>
             <Card>
               <p className="text-xs text-neutral-500">Saídas</p>
@@ -185,6 +198,17 @@ export function Finance() {
               ⬇ Baixar CSV (Excel)
             </Button>
           </div>
+
+          {!feesConfigured && report.plansCount > 0 && (
+            <p className="text-xs text-neutral-500">
+              As mensalidades aparecem pelo valor cheio. Para ver o líquido (sem as taxas da InfinitePay), preencha as
+              taxas em{' '}
+              <Link to="/owner/settings" className="underline underline-offset-2">
+                Configurações
+              </Link>
+              .
+            </p>
+          )}
 
           {report.notClosed > 0 && (
             <Card className="border-amber-500/30 bg-amber-500/5 text-sm text-amber-300">

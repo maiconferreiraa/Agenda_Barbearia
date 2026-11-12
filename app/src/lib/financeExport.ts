@@ -47,7 +47,8 @@ export function exportCsv(shop: string, p: Period, r: FinanceReport) {
   const lines: (string | number)[][] = []
   const total = r.plansTotal + r.walkInTotal
   lines.push([`Relatório financeiro - ${shop}`], [`Período: ${p.label}`], [])
-  lines.push(['RESUMO'], ['Entradas', total], ['Saídas', r.expensesTotal], [total - r.expensesTotal < 0 ? 'Prejuízo' : 'Lucro', total - r.expensesTotal])
+  const profit = total - r.feesTotal - r.expensesTotal
+  lines.push(['RESUMO'], ['Entradas', total], ['Taxas InfinitePay (estimado)', r.feesTotal], ['Entradas líquidas', total - r.feesTotal], ['Saídas', r.expensesTotal], [profit < 0 ? 'Prejuízo' : 'Lucro', profit])
   lines.push(['Mensalidades', r.plansTotal], ['Avulsos (balcão)', r.walkInTotal])
   lines.push(['Pagamentos de mensalidade', r.plansCount], ['Atendimentos avulsos', r.walkInCount], ['Serviços pelo plano', r.creditUses], [])
 
@@ -128,8 +129,10 @@ export async function exportPdf(shop: string, p: Period, r: FinanceReport) {
     head: [['Resumo', 'Valor']],
     body: [
       ['Entradas', brl(total)],
+      ['Taxas InfinitePay (estimado)', brl(r.feesTotal)],
+      ['Entradas líquidas', brl(total - r.feesTotal)],
       ['Saídas', brl(r.expensesTotal)],
-      [total - r.expensesTotal < 0 ? 'Prejuízo' : 'Lucro', brl(total - r.expensesTotal)],
+      [total - r.feesTotal - r.expensesTotal < 0 ? 'Prejuízo' : 'Lucro', brl(total - r.feesTotal - r.expensesTotal)],
       [`Mensalidades (${r.plansCount} pagamento(s))`, brl(r.plansTotal)],
       [`Avulsos no balcão (${r.walkInCount} atendimento(s))`, brl(r.walkInTotal)],
       ['Serviços feitos pelo plano', String(r.creditUses)],

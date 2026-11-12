@@ -161,6 +161,10 @@ export interface Payment {
   kind?: 'first' | 'renewal' | 'upgrade'
   transactionNsu?: string
   captureMethod?: string
+  /** Quanto o cliente pagou (maior que amount quando a taxa foi repassada a ele). */
+  paidByClient?: number
+  feePassedToClient?: boolean
+  installments?: number | null
   receiptUrl?: string
   description?: string
   paidAt?: Timestamp
@@ -210,6 +214,12 @@ export interface BusinessSettings {
   >
   /** Oferta mandada no WhatsApp para quem cancela o plano. */
   retentionOffer?: string
+}
+
+/** ownerSettings/taxas — só o dono lê (regras do Firestore). Em %; a API da InfinitePay não informa. */
+export interface FeeSettings {
+  feePixPercent?: number
+  feeCardPercent?: number
 }
 
 export const EXPENSE_CATEGORIES = [

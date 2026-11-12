@@ -57,6 +57,11 @@ service cloud.firestore {
       allow create, delete: if false;
     }
 
+    // ---- dados só do dono (ex.: taxas da InfinitePay) — cliente não lê ----
+    match /ownerSettings/{docId} {
+      allow read, write: if isOwner();
+    }
+
     // ---- horários cancelados (resumo para o relatório; o horário em si é apagado) ----
     match /canceledAppointments/{appointmentId} {
       allow read: if isOwner();
