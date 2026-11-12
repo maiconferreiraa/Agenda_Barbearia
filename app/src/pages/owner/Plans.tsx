@@ -26,13 +26,17 @@ export function Plans() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Plan | null>(null)
   const [saving, setSaving] = useState(false)
+  /** Como o plano cobra: link novo todo mês (automático) ou cartão recorrente da maquininha. */
+  const [billing, setBilling] = useState<'link' | 'card'>('link')
 
   function openNew() {
     setEditing(null)
+    setBilling('link')
     setModalOpen(true)
   }
   function openEdit(p: Plan) {
     setEditing(p)
+    setBilling(p.recurringLink ? 'card' : 'link')
     setModalOpen(true)
   }
 
@@ -53,9 +57,15 @@ export function Plans() {
       active: form.get('active') === 'on',
       includedServices,
       // em espera: sem o campo na tela, mantém o que já estiver salvo
-      recurringLink: CARD_RECURRING_ENABLED
-        ? String(form.get('recurringLink') || '').trim() || null
-        : (editing?.recurringLink ?? null),
+      recurringLink: !CARD_RECURRING_ENABLED
+        ? (editing?.recurringLink ?? null)
+        : billing === 'card'
+          ? String(form.get('recurringLink') || '').trim() || null
+          : null,
+    }
+    if (billing === 'card' && CARD_RECURRING_ENABLED && !payload.recurringLink) {
+      alert('Cole o link do plano recorrente da InfinitePay, ou escolha "Link todo mês".')
+      return
     }
     if (payload.recurringLink && !/^https:\/\/([a-z0-9-]+\.)*infinitepay\.io\//i.test(payload.recurringLink)) {
       alert('O link de cobrança recorrente precisa ser um link da InfinitePay (começa com https:// e tem infinitepay.io).')
@@ -173,19 +183,46 @@ export function Plans() {
           </div>
 
           {CARD_RECURRING_ENABLED && (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-neutral-400">Como cobrar este plano</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                ['link', '🔗 Link todo mês', 'O sistema manda o link (Pix ou cartão) e sabe sozinho quem pagou.'],
+                ['card', '💳 Cartão recorrente', 'Igual à maquininha: desconta sozinho no cartão todo mês.'],
+              ] as const).map(([value, title, desc]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setBilling(value)}
+                  className={`rounded-lg border p-3 text-left transition-colors ${billing === value ? 'border-gold bg-gold/10' : 'border-ink-border bg-ink-card hover:border-gold-dark'}`}
+                >
+                  <p className="text-sm font-medium text-neutral-100">{title}</p>
+                  <p className="text-xs text-neutral-500">{desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+          )}
+
+          {CARD_RECURRING_ENABLED && billing === 'card' && (
           <div className="space-y-1.5 rounded-lg border border-ink-border p-3">
             <Input
               name="recurringLink"
               type="url"
-              label="💳 Link de cobrança recorrente da InfinitePay (opcional)"
+              label="💳 Link do plano recorrente da InfinitePay"
               defaultValue={editing?.recurringLink ?? ''}
               placeholder="https://…infinitepay.io/…"
             />
             <p className="text-xs text-neutral-500">
               No app da InfinitePay: <b>Vendas → Planos e Recorrência → Planos e cobranças</b> → toque no plano com o
               mesmo valor → <b>copiar link</b>, e cole aqui. O cliente se cadastra lá, paga o 1º mês na hora e a
-              InfinitePay desconta sozinha todo mês. Sem link, o sistema manda um link de pagamento (Pix ou cartão)
-              todo mês.
+              InfinitePay desconta sozinha todo mês.
+            </p>
+            <p className="rounded-md border border-amber-500/30 bg-amber-500/5 px-2.5 py-2 text-xs text-amber-300">
+              ⚠️ <b>Importante:</b> a InfinitePay não avisa o sistema dos pagamentos no cartão. Para o sistema ficar
+              igual à sua maquininha: quando um cliente novo assinar, confira no app da InfinitePay e toque em{' '}
+              <b>Confirmar pagamento</b> em Assinaturas (só no 1º mês). Se o app mostrar uma cobrança{' '}
+              <b>recusada</b>, toque em <b>Cartão recusado</b>. O resto (renovação, créditos e lembretes) é automático.
             </p>
           </div>
           )}

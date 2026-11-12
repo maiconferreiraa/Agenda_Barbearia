@@ -8,6 +8,7 @@ import { formatCurrency, formatDate } from '../../lib/format'
 import { subscriptionHealth, HEALTH_DOT, HEALTH_TEXT } from '../../lib/subscriptionHealth'
 import { cancelSubscriptionFn, confirmCardPaymentFn, markCardRefusedFn } from '../../lib/paymentsApi'
 import { ImportSubscriptionModal } from '../../components/ImportSubscriptionModal'
+import { CARD_RECURRING_ENABLED } from '../../lib/features'
 
 export function Subscriptions() {
   const { data: subscriptions, loading } = useAllSubscriptions()
@@ -59,6 +60,33 @@ export function Subscriptions() {
           + Importar do sistema antigo
         </Button>
       </div>
+
+      {CARD_RECURRING_ENABLED && (() => {
+        const card = subscriptions.filter((s) => s.billingMode === 'card_recurring')
+        const waiting = card.filter((s) => s.status === 'pending')
+        if (card.length === 0) return null
+        return (
+          <Card
+            className={
+              waiting.length > 0
+                ? 'border-amber-500/40 bg-amber-500/5 text-sm text-amber-300'
+                : 'border-ink-border text-sm text-neutral-400'
+            }
+          >
+            {waiting.length > 0 && (
+              <p className="mb-1 font-medium">
+                💳 {waiting.length} cliente(s) esperando você confirmar o 1º pagamento no cartão.
+              </p>
+            )}
+            <p>
+              Planos no <b>cartão recorrente</b>: a InfinitePay não avisa o sistema. Confira no app da InfinitePay
+              (<b>Vendas → Planos e Recorrência</b>) e toque em <b>Confirmar pagamento</b> no 1º mês de cada cliente
+              novo. Se aparecer cobrança <b>recusada</b>, toque em <b>Cartão recusado</b> — assim o sistema fica igual
+              à sua maquininha.
+            </p>
+          </Card>
+        )
+      })()}
 
       {loading && <Spinner full />}
 

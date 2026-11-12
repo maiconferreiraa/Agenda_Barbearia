@@ -1,7 +1,7 @@
 /**
  * Cartão recorrente da InfinitePay (link de "Planos e cobranças" colado no plano).
- * Em espera: aguardando o suporte da InfinitePay dizer se existe webhook/API
- * para saber quando a cobrança passa ou falha. Enquanto false, o campo do link
- * e a opção na importação ficam escondidos (o resto do código continua pronto).
+ * A InfinitePay não avisa o sistema (sem webhook/API para planos — confirmado
+ * pelo suporte em 12/11/2026): o dono confirma o 1º pagamento e marca
+ * "Cartão recusado" quando o app da InfinitePay mostrar recusa.
  */
-export const CARD_RECURRING_ENABLED = false
+export const CARD_RECURRING_ENABLED = true

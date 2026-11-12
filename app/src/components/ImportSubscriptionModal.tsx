@@ -93,7 +93,7 @@ export function ImportSubscriptionModal({ open, onClose }: { open: boolean; onCl
   const preview = (() => {
     if (problem || !due || !plan) return null
     if (paid === 'card')
-      return `Nada de link: a InfinitePay segue cobrando o cartão. Em ${br(due)} o sistema renova o plano e os créditos sozinho; se o cartão for recusado, você toca em "Cartão recusado" em Assinaturas.`
+      return `Já entra ativo (não precisa confirmar). Nada de link: a InfinitePay segue cobrando o cartão. Em ${br(due)} o sistema renova o plano e os créditos sozinho. Se o app da InfinitePay mostrar cobrança recusada, toque em "Cartão recusado" em Assinaturas.`
     if (paid) {
       const send = new Date(due)
       send.setDate(send.getDate() - INVOICE_LEAD_DAYS)
