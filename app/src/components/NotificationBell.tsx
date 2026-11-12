@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { doc, updateDoc, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDocs, limit, query, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { db } from '../firebase'
 import { useAuth } from '../contexts/AuthContext'
 import { useNotifications } from '../hooks/useNotifications'
@@ -33,6 +33,31 @@ export function NotificationBell() {
     await batch.commit()
   }
 
+  const [clearing, setClearing] = useState(false)
+  /** Apaga todo o histórico de notificações (em lotes, até acabar). */
+  async function clearAll() {
+    if (!profile || notifications.length === 0) return
+    const quem = profile.role === 'owner' ? 'da barbearia (some para todas as contas de dono)' : 'suas'
+    if (!confirm(`Apagar todas as notificações ${quem}? Não dá para desfazer.`)) return
+    setClearing(true)
+    try {
+      const base = collection(db, 'notifications')
+      const filtro =
+        profile.role === 'owner' ? where('targetRole', '==', 'owner') : where('targetUserId', '==', profile.uid)
+      for (;;) {
+        const snap = await getDocs(query(base, filtro, limit(300)))
+        if (snap.empty) break
+        const batch = writeBatch(db)
+        snap.docs.forEach((d) => batch.delete(d.ref))
+        await batch.commit()
+      }
+    } catch (err) {
+      alert('Não foi possível limpar agora. ' + (err as Error).message)
+    } finally {
+      setClearing(false)
+    }
+  }
+
   async function markRead(n: AppNotification) {
     if (n.read) return
     await updateDoc(doc(db, 'notifications', n.id), { read: true })
@@ -59,9 +84,20 @@ export function NotificationBell() {
           <div className="absolute right-0 z-50 mt-2 max-h-[70vh] w-80 overflow-y-auto rounded-xl border border-ink-border bg-ink-soft shadow-2xl">
             <div className="flex items-center justify-between border-b border-ink-border px-3 py-2.5">
               <span className="text-sm font-medium text-gold-light">Notificações</span>
-              <button onClick={markAllRead} className="text-xs text-neutral-400 hover:text-gold-light">
-                Marcar todas como lidas
-              </button>
+              <span className="flex items-center gap-3">
+                <button onClick={markAllRead} className="text-xs text-neutral-400 hover:text-gold-light">
+                  Marcar como lidas
+                </button>
+                {notifications.length > 0 && (
+                  <button
+                    onClick={clearAll}
+                    disabled={clearing}
+                    className="text-xs text-red-400 hover:text-red-300 disabled:opacity-50"
+                  >
+                    {clearing ? 'Limpando…' : 'Limpar'}
+                  </button>
+                )}
+              </span>
             </div>
             {notifications.length === 0 && (
               <p className="px-3 py-6 text-center text-sm text-neutral-500">Sem notificações por aqui.</p>

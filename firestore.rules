@@ -128,7 +128,10 @@ service cloud.firestore {
       // Cliente/dono só pode marcar como lida (read: true), nada mais.
       allow update: if (isOwner() || (isSignedIn() && resource.data.targetUserId == request.auth.uid))
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
-      allow create, delete: if false;
+      // "Limpar histórico": o dono apaga as da barbearia; o cliente, só as dele.
+      allow delete: if (isOwner() && resource.data.targetRole == 'owner')
+        || (isSignedIn() && resource.data.targetUserId == request.auth.uid);
+      allow create: if false;
     }
   }
 }
