@@ -5,3 +5,10 @@
  * "Cartão recusado" quando o app da InfinitePay mostrar recusa.
  */
 export const CARD_RECURRING_ENABLED = true
+
+/**
+ * Ligar a ficha do sistema antigo à conta do app (código no WhatsApp).
+ * EM ESPERA a pedido do usuário (12/11/2026): pronto, mas desligado.
+ * Para ligar: true aqui e LINK_ACCOUNT_ENABLED em worker/src/api/linkAccount.ts.
+ */
+export const LINK_ACCOUNT_ENABLED = false

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { Card } from '../../components/ui/Card'
+import { LinkAccountCard } from '../../components/LinkAccountCard'
 import { Button } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
 import { StatusBadge } from '../../components/StatusBadge'
@@ -140,6 +141,8 @@ export function MySubscription() {
           </Link>
         </Card>
       )}
+
+      {!loading && !current && <LinkAccountCard />}
 
       {current && (
         <Card>

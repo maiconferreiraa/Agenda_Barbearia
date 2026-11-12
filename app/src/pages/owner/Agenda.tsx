@@ -138,9 +138,9 @@ export function Agenda() {
   }
   const dayFullyBlocked = isOpen && grid.slots.length > 0 && grid.slots.every((s) => s.block)
 
-  async function changeStatus(id: string, status: AppointmentStatus) {
+  async function changeStatus(id: string, status: AppointmentStatus, paymentMethod?: PayMethod) {
     try {
-      await setAppointmentStatusFn({ appointmentId: id, status })
+      await setAppointmentStatusFn({ appointmentId: id, status, ...(paymentMethod ? { paymentMethod } : {}) })
     } catch (err) {
       alert((err as Error).message)
     }
@@ -272,15 +272,24 @@ export function Agenda() {
   )
 }
 
+type PayMethod = 'dinheiro' | 'pix' | 'cartao'
+const PAY_LABEL: Record<PayMethod, string> = { dinheiro: '💵 Dinheiro', pix: 'Pix', cartao: '💳 Cartão' }
+
 function AppointmentCard({
   a,
   onChange,
   showTime = false,
 }: {
   a: Appointment
-  onChange: (id: string, status: AppointmentStatus) => void
+  onChange: (id: string, status: AppointmentStatus, paymentMethod?: PayMethod) => void
   showTime?: boolean
 }) {
+  // Avulso a pagar: ao concluir, pergunta como pagou (taxa da maquininha no relatório).
+  const [askPay, setAskPay] = useState(false)
+  const options = [
+    ...(NEXT_STATUS[a.status] ?? []),
+    ...(a.status === 'done' && a.autoCompleted ? [{ label: 'Não compareceu', to: 'no_show' as AppointmentStatus }] : []),
+  ]
   return (
     <Card className={`flex flex-wrap items-center justify-between gap-3 !py-3 ${a.status === 'canceled' ? 'opacity-50' : ''}`}>
       <div className="flex min-w-0 items-center gap-3">
@@ -298,16 +307,43 @@ function AppointmentCard({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <StatusBadge status={a.status} />
-        {NEXT_STATUS[a.status]?.map((opt) => (
-          <Button
-            key={opt.to}
-            variant={opt.to === 'canceled' ? 'danger' : 'secondary'}
-            onClick={() => onChange(a.id, opt.to)}
-            className="!px-2.5 !py-1.5 text-xs"
-          >
-            {opt.label}
-          </Button>
-        ))}
+        {a.status === 'done' && (
+          <span className="text-[11px] text-neutral-500">
+            {a.autoCompleted ? 'concluído sozinho' : a.paymentMethod ? PAY_LABEL[a.paymentMethod] : ''}
+          </span>
+        )}
+        {askPay ? (
+          <span className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-neutral-400">Pagou como?</span>
+            {(Object.keys(PAY_LABEL) as PayMethod[]).map((m) => (
+              <Button
+                key={m}
+                variant="secondary"
+                onClick={() => {
+                  setAskPay(false)
+                  onChange(a.id, 'done', m)
+                }}
+                className="!px-2.5 !py-1.5 text-xs"
+              >
+                {PAY_LABEL[m]}
+              </Button>
+            ))}
+            <button type="button" onClick={() => setAskPay(false)} className="text-xs text-neutral-500 underline">
+              voltar
+            </button>
+          </span>
+        ) : (
+          options.map((opt) => (
+            <Button
+              key={opt.to}
+              variant={opt.to === 'canceled' ? 'danger' : 'secondary'}
+              onClick={() => (opt.to === 'done' && a.price > 0 ? setAskPay(true) : onChange(a.id, opt.to))}
+              className="!px-2.5 !py-1.5 text-xs"
+            >
+              {opt.label}
+            </Button>
+          ))
+        )}
       </div>
     </Card>
   )

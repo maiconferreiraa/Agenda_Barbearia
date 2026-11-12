@@ -54,7 +54,7 @@ export const cancelMyAppointmentFn = callApi<
 
 /** Dono muda o status pela agenda; cancelar devolve o crédito do plano. */
 export const setAppointmentStatusFn = callApi<
-  { appointmentId: string; status: AppointmentStatus },
+  { appointmentId: string; status: AppointmentStatus; paymentMethod?: 'dinheiro' | 'pix' | 'cartao' },
   { ok: true; creditReturned: boolean }
 >('setAppointmentStatus')
 

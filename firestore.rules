@@ -62,6 +62,11 @@ service cloud.firestore {
       allow read, write: if isOwner();
     }
 
+    // ---- códigos de ligação de conta (só o servidor) ----
+    match /linkCodes/{uid} {
+      allow read, write: if false;
+    }
+
     // ---- feriados e dias fechados (o servidor avisa os clientes) ----
     match /holidays/{day} {
       allow read, write: if isOwner();

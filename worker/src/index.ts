@@ -29,6 +29,8 @@ import { claimUsername, loginWithUsername, usernameAvailable } from './api/usern
 import { runBilling } from './scheduled'
 import { runAppointmentReminders } from './reminders'
 import { runHolidayNotices } from './holidays'
+import { runAutoComplete } from './autoComplete'
+import { confirmLinkCode, requestLinkCode } from './api/linkAccount'
 
 /** Endpoints chamados pelo app: POST /api/<nome>, com o token de login. */
 const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
@@ -49,6 +51,9 @@ const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
   updateClientPhone,
   confirmCardPayment,
   markCardRefused,
+  // em espera (LINK_ACCOUNT_ENABLED = false responde "não encontrada")
+  requestLinkCode,
+  confirmLinkCode,
 }
 
 const PUBLIC_ROUTES: Record<string, (env: Env, fs: Firestore, data: Record<string, unknown>) => Promise<unknown>> = {
@@ -131,7 +136,9 @@ export default {
         .then(() => runAppointmentReminders(env))
         .catch((err) => console.error('Lembretes de horário falharam', String(err)))
         .then(() => runHolidayNotices(env))
-        .catch((err) => console.error('Avisos de feriado falharam', String(err))),
+        .catch((err) => console.error('Avisos de feriado falharam', String(err)))
+        .then(() => runAutoComplete(env))
+        .catch((err) => console.error('Concluir sozinho falhou', String(err))),
     )
   },
 } satisfies ExportedHandler<Env>

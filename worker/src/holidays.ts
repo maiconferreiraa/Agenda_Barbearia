@@ -87,6 +87,19 @@ export async function runHolidayNotices(env: Env) {
     const to = normalizePhoneBr(c.data.phone)
     if (to && !people.has(to)) people.set(to, String(c.data.name ?? ''))
   }
+  // + quem marcou sem cadastro (pelo /agendar ou pelo dono) no último ano
+  const yearAgo = now.getTime() - 365 * DAY_MS
+  const guests = [
+    ...(await fs.query('appointments', { where: [{ field: 'bookedBy', op: '==', value: 'guest' }], limit: 500 })),
+    ...(await fs.query('appointments', { where: [{ field: 'bookedBy', op: '==', value: 'owner' }], limit: 500 })).filter(
+      (d) => !d.data.clientId,
+    ),
+  ]
+  for (const g of guests) {
+    if ((g.data.date as Date).getTime() < yearAgo) continue
+    const to = normalizePhoneBr(g.data.clientPhone)
+    if (to && !people.has(to)) people.set(to, String(g.data.clientName ?? ''))
+  }
 
   for (const h of todo) {
     if (budget.used >= 46) break

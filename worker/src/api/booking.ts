@@ -472,7 +472,14 @@ export async function setAppointmentStatus(ctx: Ctx) {
   if (doc.data.status === 'canceled') {
     throw new ApiError('failed-precondition', 'Horário cancelado não pode ser reaberto. Marque um novo.')
   }
-  await fs.update(doc.path, { status })
+  const update: Data = { status }
+  if (status === 'done') {
+    // Avulso: como pagou no balcão (o relatório desconta a taxa da maquininha em Pix/cartão).
+    const method = String(data.paymentMethod ?? '')
+    update.paymentMethod = ['dinheiro', 'pix', 'cartao'].includes(method) ? method : null
+    update.autoCompleted = false
+  }
+  await fs.update(doc.path, update)
   return { ok: true, creditReturned: false }
 }
 

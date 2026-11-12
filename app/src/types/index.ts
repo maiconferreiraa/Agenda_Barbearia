@@ -123,6 +123,10 @@ export interface Appointment {
   usedPlanCredit?: boolean
   date: Timestamp
   status: AppointmentStatus
+  /** Como pagou no balcão (ao concluir): define a taxa no relatório. */
+  paymentMethod?: 'dinheiro' | 'pix' | 'cartao' | null
+  /** Concluído sozinho no dia seguinte (o dono não marcou). */
+  autoCompleted?: boolean
   canceledBy?: 'client' | 'owner'
   /** Quem marcou: o próprio cliente pelo app ou o dono pela agenda. */
   bookedBy?: 'client' | 'owner'

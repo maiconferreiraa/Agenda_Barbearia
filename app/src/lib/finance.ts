@@ -226,11 +226,15 @@ export function buildReport(
       }
     }
     if (paidHere > 0) {
+      // Pix/cartão no balcão também paga taxa da maquininha; dinheiro e "não informado" não.
+      const walkRate = a.paymentMethod === 'pix' ? fees.pix : a.paymentMethod === 'cartao' ? fees.card : 0
+      if (walkRate && walkRate > 0) feesTotal += Math.round(paidHere * walkRate) / 100
       walkInDetails.push({
         date: when,
         client: a.clientName,
         item: lines.filter((l) => !l.usedPlanCredit).map((l) => l.serviceName).join(' + '),
-        method: 'Balcão',
+        method:
+          a.paymentMethod === 'dinheiro' ? 'Dinheiro' : a.paymentMethod === 'pix' ? 'Pix' : a.paymentMethod === 'cartao' ? 'Cartão' : 'Balcão',
         amount: paidHere,
       })
       walkInTotal += paidHere
