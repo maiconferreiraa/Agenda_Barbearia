@@ -26,7 +26,8 @@ import { MySubscription } from './pages/client/MySubscription'
 function Home() {
   const { profile, loading } = useAuth()
   if (loading) return <Spinner full />
-  if (!profile) return <Navigate to="/login" replace />
+  // Link único da barbearia: quem não está logado cai no cadastro (de lá pode entrar ou agendar sem conta).
+  if (!profile) return <Navigate to="/register" replace />
   return <Navigate to={profile.role === 'owner' ? '/owner' : '/app'} replace />
 }
 

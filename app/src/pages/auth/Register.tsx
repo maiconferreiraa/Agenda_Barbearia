@@ -146,6 +146,13 @@ export function Register() {
             </Link>
           </p>
         </form>
+        <Link
+          to="/agendar"
+          className="mt-4 block rounded-2xl border border-ink-border bg-ink-card/50 p-4 text-center hover:border-gold-dark"
+        >
+          <p className="text-sm font-medium text-neutral-100">Prefere não se cadastrar?</p>
+          <p className="text-xs text-neutral-500">Marque seu horário só com nome e telefone →</p>
+        </Link>
       </div>
     </div>
   )
