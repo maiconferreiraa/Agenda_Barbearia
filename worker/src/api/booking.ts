@@ -1,6 +1,6 @@
 import { ApiError } from '../env'
 import type { Ctx } from './ctx'
-import { requireOwner } from './ctx'
+import { requireOwner, requireStaff } from './ctx'
 import type { Data, Firestore } from '../firestore'
 import { notify } from '../notify'
 import { PHONE_RULE, businessInfo, firstName, queueWhatsapp, strictPhoneBr } from '../whatsapp'
@@ -102,10 +102,26 @@ async function loadServices(fs: Firestore, serviceIds: unknown) {
   })
 }
 
-/** Bloqueios que o dono fez na agenda (agendaBlocks) no dia. */
-async function blockRanges(fs: Firestore, date: Date, txQuery?: Firestore['query']) {
-  const q = txQuery ?? fs.query.bind(fs)
-  return busyRanges(await q('agendaBlocks', { where: dayRange(date) }))
+/** Quem atende (dono com "Eu também atendo" e colaboradores ativos). Vazio = agenda única. */
+export interface Barber {
+  id: string
+  name: string
+}
+export async function listBarbers(fs: Firestore): Promise<Barber[]> {
+  const docs = await fs.query('users', { where: [{ field: 'attends', op: '==', value: true }], limit: 50 })
+  return docs
+    .filter((d) => (d.data.role === 'owner' || d.data.role === 'barber') && d.data.active !== false)
+    .map((d) => ({ id: d.id, name: String(d.data.name ?? '').trim() || 'Barbeiro', owner: d.data.role === 'owner' }))
+    .sort((a, b) => Number(b.owner) - Number(a.owner) || a.name.localeCompare(b.name, 'pt-BR'))
+    .map(({ id, name }) => ({ id, name }))
+}
+
+/** Horários/bloqueios do dia que ocupam a agenda de um barbeiro. Sem barberId = da agenda do 1º barbeiro (antigos) / bloqueio da barbearia toda. */
+function busyFor(barberId: string, defaultBarber: string, appts: { data: Data }[], blocks: { data: Data }[]) {
+  return [
+    ...busyRanges(appts.filter((a) => ((a.data.barberId as string | null | undefined) ?? defaultBarber) === barberId)),
+    ...busyRanges(blocks.filter((b) => !b.data.barberId || b.data.barberId === barberId)),
+  ]
 }
 
 function busyRanges(docs: { data: Data }[]): Range[] {
@@ -133,16 +149,27 @@ export async function getAvailableSlots({ fs, data }: Ctx) {
   const duration = services.reduce((s, x) => s + x.durationMinutes, 0)
 
   const settings = await loadSettings(fs)
-  const [appts, blocks] = await Promise.all([
+  const [appts, blockDocs, barbers] = await Promise.all([
     fs.query('appointments', { where: dayRange(day) }),
-    blockRanges(fs, day),
+    fs.query('agendaBlocks', { where: dayRange(day) }),
+    listBarbers(fs),
   ])
-  const busy = [...busyRanges(appts), ...blocks, ...lunchRange(settings)]
   const p = sp(day)
-  const slots = freeStarts(day, duration, settings, busy).map((start) =>
-    spDate(p.year, p.month, p.day, start).toISOString(),
-  )
-  return { slots }
+  const toIso = (start: number) => spDate(p.year, p.month, p.day, start).toISOString()
+  if (barbers.length === 0) {
+    const busy = [...busyRanges(appts), ...busyRanges(blockDocs), ...lunchRange(settings)]
+    return { slots: freeStarts(day, duration, settings, busy).map(toIso) }
+  }
+  // um barbeiro escolhido, ou "sem preferência" = qualquer um livre
+  const wanted = typeof data.barberId === 'string' && data.barberId !== 'any' ? data.barberId : null
+  const pool = wanted ? barbers.filter((b) => b.id === wanted) : barbers
+  if (pool.length === 0) throw new ApiError('not-found', 'Esse barbeiro não está atendendo.')
+  const all = new Set<number>()
+  for (const b of pool) {
+    const busy = [...busyFor(b.id, barbers[0].id, appts, blockDocs), ...lunchRange(settings)]
+    for (const s of freeStarts(day, duration, settings, busy)) all.add(s)
+  }
+  return { slots: [...all].sort((a, b) => a - b).map(toIso) }
 }
 
 interface BookInput {
@@ -154,7 +181,9 @@ interface BookInput {
   date: Date
   /** 'auto' (cliente): usa crédito quando tiver; 'plan' (dono): exige crédito; 'walk_in': cobra tudo. */
   payMode: 'auto' | 'plan' | 'walk_in'
-  bookedBy: 'client' | 'owner' | 'guest'
+  bookedBy: 'client' | 'owner' | 'guest' | 'barber'
+  /** Barbeiro escolhido; 'any'/vazio = o que estiver livre (o menos ocupado do dia). */
+  barberId?: string | null
 }
 
 /** Cria o horário numa transação: confere se está livre e desconta crédito do plano. */
@@ -166,18 +195,39 @@ async function createAppointment(fs: Firestore, input: BookInput) {
   const services = await loadServices(fs, input.serviceIds)
   const totalDuration = services.reduce((s, x) => s + x.durationMinutes, 0)
   const appointmentId = fs.newId()
-  const settings = await loadSettings(fs)
+  const [settings, barbers] = await Promise.all([loadSettings(fs), listBarbers(fs)])
+  const wanted = input.barberId && input.barberId !== 'any' ? input.barberId : null
+  if (wanted && barbers.length > 0 && !barbers.some((b) => b.id === wanted)) {
+    throw new ApiError('not-found', 'Esse barbeiro não está atendendo.')
+  }
 
   const appointment = await fs.runTransaction(async (tx) => {
     const dayDocs = await tx.query('appointments', { where: dayRange(date) })
-    const blocks = busyRanges(await tx.query('agendaBlocks', { where: dayRange(date) }))
+    const blockDocs = await tx.query('agendaBlocks', { where: dayRange(date) })
     const start = sp(date).minutes
     const end = start + totalDuration
-    if (busyRanges(dayDocs).some((b) => start < b.end && end > b.start)) {
-      throw new ApiError('already-exists', 'Esse horário acabou de ser ocupado. Escolha outro.')
-    }
-    if ([...blocks, ...lunchRange(settings)].some((b) => start < b.end && end > b.start)) {
+    const hits = (r: Range[]) => r.some((b) => start < b.end && end > b.start)
+    if (hits(lunchRange(settings))) {
       throw new ApiError('failed-precondition', 'Esse horário está bloqueado na agenda (almoço ou bloqueio). Escolha outro.')
+    }
+    let barber: Barber | null = null
+    if (barbers.length === 0) {
+      if (hits(busyRanges(dayDocs))) throw new ApiError('already-exists', 'Esse horário acabou de ser ocupado. Escolha outro.')
+      if (hits(busyRanges(blockDocs))) {
+        throw new ApiError('failed-precondition', 'Esse horário está bloqueado na agenda (almoço ou bloqueio). Escolha outro.')
+      }
+    } else {
+      const pool = wanted ? barbers.filter((b) => b.id === wanted) : barbers
+      const free = pool.filter((b) => !hits(busyFor(b.id, barbers[0].id, dayDocs, blockDocs)))
+      if (free.length === 0) {
+        const blocked = pool.every((b) => hits(busyRanges(blockDocs.filter((x) => !x.data.barberId || x.data.barberId === b.id))))
+        throw blocked
+          ? new ApiError('failed-precondition', 'Esse horário está bloqueado na agenda (almoço ou bloqueio). Escolha outro.')
+          : new ApiError('already-exists', 'Esse horário acabou de ser ocupado. Escolha outro.')
+      }
+      // sem preferência: o menos ocupado do dia
+      const load = (id: string) => dayDocs.filter((a) => ((a.data.barberId as string | undefined) ?? barbers[0].id) === id).length
+      barber = free.sort((a, b) => load(a.id) - load(b.id))[0]
     }
 
     let subscriptionId: string | null = null
@@ -233,6 +283,8 @@ async function createAppointment(fs: Firestore, input: BookInput) {
       date,
       status: 'scheduled',
       bookedBy: input.bookedBy,
+      barberId: barber?.id ?? null,
+      barberName: barber?.name ?? null,
       createdAt: new Date(),
     }
     tx.create(`appointments/${appointmentId}`, appt)
@@ -253,6 +305,7 @@ export async function bookAppointment({ env, fs, uid, data }: Ctx) {
     date,
     payMode: 'auto',
     bookedBy: 'client',
+    barberId: typeof data.barberId === 'string' ? data.barberId : null,
   })
 
   await notify(env, fs, {
@@ -265,6 +318,7 @@ export async function bookAppointment({ env, fs, uid, data }: Ctx) {
   if (appointment.clientPhone) {
     await confirmByWhatsapp(fs, appointmentId, appointment.clientName, appointment.clientPhone, appointment)
   }
+  await notifyBarber(env, fs, appointmentId, appointment)
   return { appointmentId, usedPlanCredit: appointment.usedPlanCredit }
 }
 
@@ -273,7 +327,7 @@ async function confirmByWhatsapp(
   appointmentId: string,
   clientName: string,
   phone: string,
-  appointment: { serviceName: string; usedPlanCredit: boolean; price: number; date: Date },
+  appointment: { serviceName: string; usedPlanCredit: boolean; price: number; date: Date; barberName?: string | null },
 ) {
   const { name } = await businessInfo(fs)
   await queueWhatsapp(fs, {
@@ -282,11 +336,27 @@ async function confirmByWhatsapp(
     relatedId: appointmentId,
     text:
       `✂️ Olá, ${firstName(clientName)}! Seu horário na ${name} está marcado:\n` +
-      `*${appointment.serviceName}* — ${formatDateTimeBr(appointment.date)}.` +
+      `*${appointment.serviceName}* — ${formatDateTimeBr(appointment.date)}` +
+      (appointment.barberName ? ` com *${appointment.barberName}*.` : '.') +
       (appointment.usedPlanCredit
         ? '\nUsando crédito do seu plano.'
         : `\nValor: ${brl(appointment.price)} (pago na barbearia).`) +
       '\n\nSe não puder vir, avise com antecedência. Até lá!',
+  })
+}
+
+/** Avisa o colaborador no sininho quando um horário cai na agenda dele (o dono já recebe pelos avisos da barbearia). */
+async function notifyBarber(env: Ctx['env'], fs: Firestore, appointmentId: string, a: { barberId?: string | null; clientName: string; serviceName: string; date: Date }, skipUid?: string) {
+  if (!a.barberId || a.barberId === skipUid) return
+  const b = await fs.get(`users/${a.barberId}`)
+  if (b?.data.role !== 'barber') return
+  await notify(env, fs, {
+    type: 'appointment_new',
+    targetUserId: a.barberId,
+    relatedId: appointmentId,
+    link: '/barber',
+    title: 'Novo horário na sua agenda',
+    message: `${a.clientName} — ${a.serviceName} em ${formatDateTimeBr(a.date)}.`,
   })
 }
 
@@ -295,9 +365,12 @@ async function confirmByWhatsapp(
  * ou `clientName` (+ telefone) para quem não tem conta. `payMode`: 'plan' ou 'walk_in'.
  */
 export async function ownerBookAppointment(ctx: Ctx) {
-  const { env, fs, data } = ctx
-  await requireOwner(ctx)
-  const payMode = data.payMode === 'plan' ? 'plan' : 'walk_in'
+  const { env, fs, data, uid } = ctx
+  const { isOwner } = await requireStaff(ctx)
+  // colaborador marca só na agenda dele; o crédito do plano é usado sozinho quando o cliente tem
+  const payMode: BookInput['payMode'] = isOwner
+    ? data.payMode === 'plan' ? 'plan' : 'walk_in'
+    : data.payMode === 'walk_in' ? 'walk_in' : 'auto'
   const date = new Date(String(data.dateISO))
 
   let clientId: string | null = null
@@ -328,7 +401,8 @@ export async function ownerBookAppointment(ctx: Ctx) {
     serviceIds: data.serviceIds,
     date,
     payMode,
-    bookedBy: 'owner',
+    bookedBy: isOwner ? 'owner' : 'barber',
+    barberId: isOwner ? (typeof data.barberId === 'string' ? data.barberId : null) : uid,
   })
 
   // Avisa o cliente (no app, se tiver conta, e no WhatsApp, se tiver número).
@@ -344,6 +418,7 @@ export async function ownerBookAppointment(ctx: Ctx) {
     })
   }
   if (clientPhone) await confirmByWhatsapp(fs, appointmentId, clientName, clientPhone, appointment)
+  await notifyBarber(env, fs, appointmentId, appointment, uid)
   return { appointmentId, usedPlanCredit: appointment.usedPlanCredit }
 }
 
@@ -430,9 +505,14 @@ export async function cancelMyAppointment({ env, fs, uid, data }: Ctx) {
 
 /** Dono muda o status pela agenda (confirmar, concluir, faltou, cancelar). */
 export async function setAppointmentStatus(ctx: Ctx) {
-  const { env, fs, data } = ctx
-  await requireOwner(ctx)
+  const { env, fs, data, uid } = ctx
+  const { isOwner } = await requireStaff(ctx)
   const id = String(data.appointmentId ?? '')
+  if (!isOwner) {
+    // colaborador só mexe nos horários dele
+    const own = id && !id.includes('/') ? await fs.get(`appointments/${id}`) : null
+    if (!own || own.data.barberId !== uid) throw new ApiError('permission-denied', 'Esse horário não é da sua agenda.')
+  }
   const status = String(data.status ?? '')
   if (!id || id.includes('/')) throw new ApiError('invalid-argument', 'Horário inválido.')
   if (!['scheduled', 'confirmed', 'done', 'canceled', 'no_show'].includes(status)) {
@@ -491,9 +571,10 @@ const GUEST_MAX_UPCOMING = 2
 /** POST /api/publicServices — serviços ativos para a página "Agendar sem cadastro". */
 export async function publicServices(fs: Firestore) {
   const docs = await fs.query('services', { where: [{ field: 'active', op: '==', value: true }] })
-  const { name } = await businessInfo(fs)
+  const [{ name }, barbers] = await Promise.all([businessInfo(fs), listBarbers(fs)])
   return {
     businessName: name,
+    barbers,
     services: docs
       .map((d) => ({
         id: d.id,
@@ -537,6 +618,7 @@ export async function guestBookAppointment(env: Ctx['env'], fs: Firestore, data:
     date,
     payMode: 'walk_in',
     bookedBy: 'guest',
+    barberId: typeof data.barberId === 'string' ? data.barberId : null,
   })
 
   await notify(env, fs, {
@@ -547,5 +629,6 @@ export async function guestBookAppointment(env: Ctx['env'], fs: Firestore, data:
     message: `${name} (${phone}) agendou ${appointment.serviceName} em ${formatDateTimeBr(date)}.`,
   })
   await confirmByWhatsapp(fs, appointmentId, name, phone, appointment)
+  await notifyBarber(env, fs, appointmentId, appointment)
   return { appointmentId, serviceName: appointment.serviceName, price: appointment.price, dateISO: date.toISOString() }
 }

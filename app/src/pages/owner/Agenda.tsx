@@ -7,7 +7,9 @@ import { Card } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { StatusBadge } from '../../components/StatusBadge'
 import { Spinner } from '../../components/ui/Spinner'
-import { useAppointmentsRange, useBlocksRange } from '../../hooks/useAppointments'
+import { useAppointmentsRange, useBarberAppointments, useBarberBlocks, useBlocksRange } from '../../hooks/useAppointments'
+import { useBarbers } from '../../hooks/useTeam'
+import { useAuth } from '../../contexts/AuthContext'
 import { appointmentPaymentLabel, formatTime } from '../../lib/format'
 import { useBusinessSettings } from '../../hooks/useBusinessSettings'
 import { weekdayKeyFor } from '../../lib/schedule'
@@ -94,10 +96,31 @@ const NEXT_STATUS: Partial<Record<AppointmentStatus, { label: string; to: Appoin
 }
 
 export function Agenda() {
+  const { profile } = useAuth()
+  /** Colaborador vê só a agenda dele; o dono escolhe de qual barbeiro (ou todos). */
+  const barberMode = profile?.role === 'barber'
   const [day, setDay] = useState(() => startOfDay(new Date()))
   const [booking, setBooking] = useState(false)
-  const { data: appointments, loading } = useAppointmentsRange(day, endOfDay(day))
-  const { data: blocks } = useBlocksRange(day, endOfDay(day))
+  const ownerAppts = useAppointmentsRange(day, endOfDay(day), !barberMode)
+  const ownerBlocks = useBlocksRange(day, endOfDay(day), !barberMode)
+  const myAppts = useBarberAppointments(barberMode ? profile?.uid : undefined)
+  const myBlocks = useBarberBlocks(barberMode ? profile?.uid : undefined)
+  const { data: barbers } = useBarbers(!barberMode)
+  const [chosen, setChosen] = useState<string>('')
+  const selected = barberMode ? profile!.uid : chosen || barbers[0]?.uid || 'all'
+  const inDay = <T extends { date: { toDate: () => Date } }>(x: T) => {
+    const d = x.date.toDate()
+    return d >= day && d <= endOfDay(day)
+  }
+  const appointments = (barberMode ? myAppts.data.filter(inDay) : ownerAppts.data).filter(
+    (a) => selected === 'all' || (a.barberId ?? barbers[0]?.uid ?? selected) === selected,
+  )
+  const blocks = (barberMode ? myBlocks.data.filter(inDay) : ownerBlocks.data).filter(
+    (b) => selected === 'all' || !b.barberId || b.barberId === selected,
+  )
+  const loading = barberMode ? myAppts.loading : ownerAppts.loading
+  const blockOwner = barberMode ? profile!.uid : selected === 'all' ? null : selected
+  const selectedName = barbers.find((b) => b.uid === selected)?.name
   const [blocking, setBlocking] = useState<number | 'day' | null>(null)
   const { settings } = useBusinessSettings()
   const dayHours = settings.hours[weekdayKeyFor(day)]
@@ -121,6 +144,8 @@ export function Agenda() {
         date: Timestamp.fromDate(at),
         durationMinutes: minutes,
         reason: key === 'day' ? 'Dia fechado' : 'Bloqueado',
+        // só da agenda deste barbeiro (null = barbearia toda)
+        barberId: blockOwner,
         createdAt: Timestamp.now(),
       })
     } catch (err) {
@@ -148,9 +173,17 @@ export function Agenda() {
 
   return (
     <div className="space-y-4">
-      <OwnerBookModal open={booking} onClose={() => setBooking(false)} day={day} />
+      <OwnerBookModal
+        open={booking}
+        onClose={() => setBooking(false)}
+        day={day}
+        barberMode={barberMode}
+        defaultBarberId={selected === 'all' ? '' : selected}
+        barbers={barbers.map((b) => ({ id: b.uid, name: b.name }))}
+        myAppointments={barberMode ? myAppts.data : undefined}
+      />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="font-display text-2xl text-neutral-100">Agenda</h1>
+        <h1 className="font-display text-2xl text-neutral-100">{barberMode ? 'Minha agenda' : 'Agenda'}</h1>
         <div className="flex items-center gap-2">
           <Button onClick={() => setBooking(true)} className="!px-3 !py-1.5 text-sm">
             + Marcar horário
@@ -167,8 +200,24 @@ export function Agenda() {
         </div>
       </div>
 
+      {!barberMode && barbers.length > 1 && (
+        <div className="flex flex-wrap gap-1.5">
+          {[...barbers.map((b) => ({ id: b.uid, name: b.name })), { id: 'all', name: 'Todos' }].map((b) => (
+            <button
+              key={b.id}
+              type="button"
+              onClick={() => setChosen(b.id)}
+              className={`rounded-full border px-3 py-1 text-sm ${selected === b.id ? 'border-gold bg-gold/10 text-neutral-100' : 'border-ink-border text-neutral-400'}`}
+            >
+              {b.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <p className="text-sm text-neutral-400 first-letter:uppercase">
         {day.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}
+        {!barberMode && selectedName && barbers.length > 1 ? ` · agenda de ${selectedName}` : ''}
       </p>
 
       {loading && <Spinner full />}
@@ -184,12 +233,18 @@ export function Agenda() {
               variant="secondary"
               loading={blocking === 'day'}
               onClick={() => {
-                if (confirm('Bloquear o dia inteiro? Nenhum cliente vai conseguir marcar neste dia. Os horários já marcados continuam.'))
+                if (
+                  confirm(
+                    blockOwner && (barberMode || barbers.length > 1)
+                      ? `Folga de ${barberMode ? 'você' : selectedName} neste dia? Ninguém marca com ${barberMode ? 'você' : 'ele'}; os outros barbeiros continuam atendendo.`
+                      : 'Bloquear o dia inteiro? Nenhum cliente vai conseguir marcar neste dia. Os horários já marcados continuam.',
+                  )
+                )
                   block(toMinutes(dayHours.open), toMinutes(dayHours.close) - toMinutes(dayHours.open), 'day')
               }}
               className="!px-2.5 !py-1 text-xs"
             >
-              ⛔ Bloquear o dia todo
+              ⛔ {blockOwner && (barberMode || barbers.length > 1) ? 'Folga neste dia' : 'Bloquear o dia todo'}
             </Button>
           )}
         </div>
@@ -210,7 +265,7 @@ export function Agenda() {
               </div>
               <div className="min-w-0 flex-1 space-y-1.5">
                 {slot.appointments.map((a) => (
-                  <AppointmentCard key={a.id} a={a} onChange={changeStatus} />
+                  <AppointmentCard key={a.id} a={a} onChange={changeStatus} showBarber={selected === 'all'} />
                 ))}
                 {slot.appointments.every((a) => a.status === 'canceled') &&
                   (slot.continuing ? (
@@ -220,7 +275,9 @@ export function Agenda() {
                   ) : slot.block ? (
                     <div className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-red-500/30 bg-red-500/5 px-3 py-1.5 text-xs text-red-300">
                       <span>⛔ {slot.block.reason === 'Dia fechado' ? 'Dia bloqueado' : slot.block.reason || 'Bloqueado'}</span>
-                      {slot.block.id.startsWith('holiday-') || slot.block.id.startsWith('closure-') ? (
+                      {barberMode && slot.block.barberId !== profile?.uid ? (
+                        <span className="text-red-300/70">barbearia fechada</span>
+                      ) : slot.block.id.startsWith('holiday-') || slot.block.id.startsWith('closure-') ? (
                         <Link to="/owner/holidays" className="underline underline-offset-2">
                           ver em Feriados
                         </Link>
@@ -264,7 +321,7 @@ export function Agenda() {
         <div className="space-y-2">
           <p className="text-xs text-neutral-500">{isOpen ? 'Fora do horário de funcionamento' : 'Agendamentos'}</p>
           {grid.outside.map((a) => (
-            <AppointmentCard key={a.id} a={a} onChange={changeStatus} showTime />
+            <AppointmentCard key={a.id} a={a} onChange={changeStatus} showTime showBarber={selected === 'all'} />
           ))}
         </div>
       )}
@@ -279,10 +336,12 @@ function AppointmentCard({
   a,
   onChange,
   showTime = false,
+  showBarber = false,
 }: {
   a: Appointment
   onChange: (id: string, status: AppointmentStatus, paymentMethod?: PayMethod) => void
   showTime?: boolean
+  showBarber?: boolean
 }) {
   // Avulso a pagar: ao concluir, pergunta como pagou (taxa da maquininha no relatório).
   const [askPay, setAskPay] = useState(false)
@@ -297,6 +356,7 @@ function AppointmentCard({
         <div className="min-w-0">
           <p className="text-sm font-medium text-neutral-100">
             {a.clientName}
+            {showBarber && a.barberName && <span className="ml-2 text-xs font-normal text-neutral-500">com {a.barberName}</span>}
             {!showTime && <span className="ml-2 text-xs font-normal text-neutral-500">{formatTime(a.date)}</span>}
           </p>
           <p className="text-xs text-neutral-400">

@@ -1,6 +1,7 @@
 import type { Timestamp } from 'firebase/firestore'
 
-export type Role = 'owner' | 'client'
+/** barber = colaborador: vê só a agenda, os clientes e a produção dele. */
+export type Role = 'owner' | 'client' | 'barber'
 
 export interface UserProfile {
   uid: string
@@ -11,6 +12,12 @@ export interface UserProfile {
   /** Usuário para entrar sem e-mail (ex.: maicon.ferreira). */
   username?: string
   fcmTokens?: string[]
+  /** Atende clientes (tem agenda própria): colaboradores e o dono, se marcar "Eu também atendo". */
+  attends?: boolean
+  /** Colaborador ativo (desativado não entra na agenda nem no app). */
+  active?: boolean
+  /** Comissão do colaborador em % sobre o que ele produz. */
+  commissionPercent?: number
   /** Aniversário "MM-DD" (sem ano), para a mensagem do dia. */
   birthday?: string | null
   /** Ficha criada pelo dono na importação do sistema antigo (sem login no app). */
@@ -127,6 +134,9 @@ export interface Appointment {
   status: AppointmentStatus
   /** Como pagou no balcão (ao concluir): define a taxa no relatório. */
   paymentMethod?: 'dinheiro' | 'pix' | 'cartao' | null
+  /** Barbeiro que atende (sem = agenda única / do primeiro barbeiro). */
+  barberId?: string | null
+  barberName?: string | null
   /** Concluído sozinho no dia seguinte (o dono não marcou). */
   autoCompleted?: boolean
   canceledBy?: 'client' | 'owner'
@@ -233,6 +243,8 @@ export interface AgendaBlock {
   date: Timestamp
   durationMinutes: number
   reason?: string
+  /** Bloqueio só da agenda deste barbeiro; null = barbearia toda. */
+  barberId?: string | null
 }
 
 /** ownerSettings/taxas — só o dono lê (regras do Firestore). Em %; a API da InfinitePay não informa. */

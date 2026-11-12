@@ -2,7 +2,7 @@ import { callApi } from './api'
 import type { AppointmentStatus } from '../types'
 
 export const bookAppointmentFn = callApi<
-  { serviceIds: string[]; dateISO: string },
+  { serviceIds: string[]; dateISO: string; barberId?: string },
   { appointmentId: string; usedPlanCredit: boolean }
 >('bookAppointment')
 
@@ -14,7 +14,10 @@ export const ownerBookAppointmentFn = callApi<
     clientPhone?: string
     serviceIds: string[]
     dateISO: string
-    payMode: 'plan' | 'walk_in'
+    /** 'auto' = colaborador (usa o crédito do plano sozinho quando o cliente tem) */
+    payMode: 'plan' | 'walk_in' | 'auto'
+    /** barbeiro (dono escolhe; 'any' = quem estiver livre) */
+    barberId?: string
   },
   { appointmentId: string; usedPlanCredit: boolean }
 >('ownerBookAppointment')
@@ -28,19 +31,24 @@ export interface PublicService {
   price: number
 }
 
-export const publicServicesFn = callApi<Record<string, never>, { businessName: string; services: PublicService[] }>(
+export const publicServicesFn = callApi<
+  Record<string, never>,
+  { businessName: string; services: PublicService[]; barbers: { id: string; name: string }[] }
+>(
   'publicServices',
 )
 
-export const publicSlotsFn = callApi<{ serviceIds: string[]; dateISO: string }, { slots: string[] }>('publicSlots')
+export const publicSlotsFn = callApi<{ serviceIds: string[]; dateISO: string; barberId?: string }, { slots: string[] }>(
+  'publicSlots',
+)
 
 export const guestBookAppointmentFn = callApi<
-  { name: string; phone: string; serviceIds: string[]; dateISO: string },
+  { name: string; phone: string; serviceIds: string[]; dateISO: string; barberId?: string },
   { appointmentId: string; serviceName: string; price: number; dateISO: string }
 >('guestBookAppointment')
 
 export const getAvailableSlotsFn = callApi<
-  { serviceIds: string[]; dateISO: string },
+  { serviceIds: string[]; dateISO: string; barberId?: string },
   { slots: string[] }
 >('getAvailableSlots')
 

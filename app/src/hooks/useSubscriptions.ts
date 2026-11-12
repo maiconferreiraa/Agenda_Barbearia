@@ -5,10 +5,10 @@ import { useCollection } from './useCollection'
 import type { Subscription } from '../types'
 
 /** Todas as assinaturas (visão do dono). */
-export function useAllSubscriptions() {
+export function useAllSubscriptions(enabled = true) {
   const q = useMemo(
-    () => query(collection(db, 'subscriptions'), orderBy('createdAt', 'desc')),
-    [],
+    () => (enabled ? query(collection(db, 'subscriptions'), orderBy('createdAt', 'desc')) : null),
+    [enabled],
   )
   return useCollection<Subscription>(q)
 }

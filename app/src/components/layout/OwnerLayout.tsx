@@ -7,7 +7,14 @@ import { ThemeToggle } from '../ThemeToggle'
 import { EnablePush } from '../EnablePush'
 import { useAuth } from '../../contexts/AuthContext'
 
-const NAV = [
+interface NavItem {
+  to: string
+  label: string
+  icon: string
+  end?: boolean
+}
+
+const NAV: NavItem[] = [
   { to: '/owner', label: 'Painel', icon: '📊', end: true },
   { to: '/owner/agenda', label: 'Agenda', icon: '🗓️' },
   { to: '/owner/holidays', label: 'Folgas e feriados', icon: '📅' },
@@ -16,18 +23,31 @@ const NAV = [
   { to: '/owner/plans', label: 'Planos', icon: '🏷️' },
   { to: '/owner/subscriptions', label: 'Assinaturas', icon: '💳' },
   { to: '/owner/clients', label: 'Clientes', icon: '👥' },
+  { to: '/owner/team', label: 'Equipe', icon: '💈' },
   { to: '/owner/settings', label: 'Configurações', icon: '⚙️' },
 ]
 
 /** No celular cabem 4 itens + "Mais"; o resto abre num painel. */
 const MOBILE_MAIN = ['/owner', '/owner/agenda', '/owner/finance', '/owner/subscriptions']
 
-export function OwnerLayout() {
+/** Colaborador: só a área dele. */
+const BARBER_NAV: NavItem[] = [
+  { to: '/barber', label: 'Minha agenda', icon: '🗓️', end: true },
+  { to: '/barber/clients', label: 'Meus clientes', icon: '👥' },
+  { to: '/barber/production', label: 'Minha produção', icon: '💰' },
+]
+
+export function BarberLayout() {
+  return <OwnerLayout nav={BARBER_NAV} mobileMain={BARBER_NAV.map((n) => n.to)} />
+}
+
+export function OwnerLayout({ nav = NAV, mobileMain = MOBILE_MAIN }: { nav?: NavItem[]; mobileMain?: string[] } = {}) {
+  const NAV = nav
   const { profile, logout } = useAuth()
   const [moreOpen, setMoreOpen] = useState(false)
   const location = useLocation()
-  const mainItems = NAV.filter((n) => MOBILE_MAIN.includes(n.to))
-  const moreItems = NAV.filter((n) => !MOBILE_MAIN.includes(n.to))
+  const mainItems = NAV.filter((n) => mobileMain.includes(n.to))
+  const moreItems = NAV.filter((n) => !mobileMain.includes(n.to))
   const moreActive = moreItems.some((n) => location.pathname.startsWith(n.to))
 
   return (

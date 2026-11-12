@@ -56,3 +56,16 @@ export const confirmCardPaymentFn = callApi<{ subscriptionId: string }, { ok: tr
 
 /** Cartão recorrente: a InfinitePay avisou que a cobrança não passou. */
 export const markCardRefusedFn = callApi<{ subscriptionId: string }, { ok: true }>('markCardRefused')
+
+// ---------- Equipe (colaboradores) ----------
+export const createCollaboratorFn = callApi<
+  { name: string; phone: string; username: string; password: string; commissionPercent: number },
+  { uid: string; username: string }
+>('createCollaborator')
+
+export const updateTeamMemberFn = callApi<
+  { id: string; attends?: boolean; commissionPercent?: number; active?: boolean; name?: string },
+  { ok: true }
+>('updateTeamMember')
+
+export const setCollaboratorPasswordFn = callApi<{ id: string; password: string }, { ok: true }>('setCollaboratorPassword')

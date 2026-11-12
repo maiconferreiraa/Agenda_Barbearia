@@ -29,34 +29,34 @@ export function useCanceledRange(start: Date, end: Date) {
 }
 
 /** Bloqueios da agenda no período (só o dono lê). */
-export function useBlocksRange(start: Date, end: Date) {
+export function useBlocksRange(start: Date, end: Date, enabled = true) {
   const startMs = start.getTime()
   const endMs = end.getTime()
   const q = useMemo(
     () =>
-      query(
+      !enabled ? null : query(
         collection(db, 'agendaBlocks'),
         where('date', '>=', Timestamp.fromMillis(startMs)),
         where('date', '<=', Timestamp.fromMillis(endMs)),
         orderBy('date', 'asc'),
       ),
-    [startMs, endMs],
+    [startMs, endMs, enabled],
   )
   return useCollection<AgendaBlock>(q)
 }
 
-export function useAppointmentsRange(start: Date, end: Date) {
+export function useAppointmentsRange(start: Date, end: Date, enabled = true) {
   const startMs = start.getTime()
   const endMs = end.getTime()
   const q = useMemo(
     () =>
-      query(
+      !enabled ? null : query(
         collection(db, 'appointments'),
         where('date', '>=', Timestamp.fromMillis(startMs)),
         where('date', '<=', Timestamp.fromMillis(endMs)),
         orderBy('date', 'asc'),
       ),
-    [startMs, endMs],
+    [startMs, endMs, enabled],
   )
   return useCollection<Appointment>(q)
 }
@@ -75,4 +75,24 @@ export function useClientAppointments(clientId: string | undefined) {
     [clientId],
   )
   return useCollection<Appointment>(q)
+}
+
+/** Colaborador: todos os horários da agenda dele (filtra por data na tela; não precisa de índice). */
+export function useBarberAppointments(barberId: string | undefined) {
+  const q = useMemo(
+    () => (barberId ? query(collection(db, 'appointments'), where('barberId', '==', barberId)) : null),
+    [barberId],
+  )
+  return useCollection<Appointment>(q)
+}
+
+/** Colaborador: bloqueios dele + os da barbearia toda (feriados, dia fechado). */
+export function useBarberBlocks(barberId: string | undefined) {
+  const mine = useCollection<AgendaBlock>(
+    useMemo(() => (barberId ? query(collection(db, 'agendaBlocks'), where('barberId', '==', barberId)) : null), [barberId]),
+  )
+  const shop = useCollection<AgendaBlock>(
+    useMemo(() => (barberId ? query(collection(db, 'agendaBlocks'), where('barberId', '==', null)) : null), [barberId]),
+  )
+  return { data: [...mine.data, ...shop.data], loading: mine.loading || shop.loading }
 }

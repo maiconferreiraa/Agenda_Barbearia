@@ -11,6 +11,13 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    // Colaborador (barbeiro) ativo: vê e mexe só na agenda dele.
+    function isBarber() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'barber' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('active', true) == true;
+    }
+
     function isOwner() {
       return isSignedIn() &&
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
@@ -52,7 +59,8 @@ service cloud.firestore {
     // Criar, desmarcar e mudar status só pelo servidor (/api/*), que também
     // desconta e devolve os créditos do plano.
     match /appointments/{appointmentId} {
-      allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid);
+      allow read: if isOwner() || (isSignedIn() && resource.data.clientId == request.auth.uid)
+        || (isBarber() && resource.data.get('barberId', null) == request.auth.uid);
       allow update: if false;
       allow create, delete: if false;
     }
@@ -80,6 +88,10 @@ service cloud.firestore {
     // ---- horários bloqueados pelo dono na agenda (o servidor desconta dos livres) ----
     match /agendaBlocks/{blockId} {
       allow read, write: if isOwner();
+      // colaborador: lê os bloqueios dele e os da barbearia toda; cria/apaga só os dele
+      allow read: if isBarber() && resource.data.get('barberId', null) in [request.auth.uid, null];
+      allow create: if isBarber() && request.resource.data.barberId == request.auth.uid;
+      allow delete: if isBarber() && resource.data.barberId == request.auth.uid;
     }
 
     // ---- horários cancelados (resumo para o relatório; o horário em si é apagado) ----

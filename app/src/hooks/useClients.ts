@@ -4,10 +4,10 @@ import { db } from '../firebase'
 import { useCollection } from './useCollection'
 import type { UserProfile } from '../types'
 
-export function useClients() {
+export function useClients(enabled = true) {
   const q = useMemo(
-    () => query(collection(db, 'users'), where('role', '==', 'client'), orderBy('name')),
-    [],
+    () => (enabled ? query(collection(db, 'users'), where('role', '==', 'client'), orderBy('name')) : null),
+    [enabled],
   )
   return useCollection<UserProfile>(q)
 }

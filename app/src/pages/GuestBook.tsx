@@ -45,10 +45,15 @@ export function GuestBook() {
   const [saving, setSaving] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [done, setDone] = useState<{ serviceName: string; price: number; dateISO: string } | null>(null)
+  const [barbers, setBarbers] = useState<{ id: string; name: string }[]>([])
+  const [barberId, setBarberId] = useState('')
 
   useEffect(() => {
     publicServicesFn({})
-      .then((r) => setServices(r.data.services))
+      .then((r) => {
+        setServices(r.data.services)
+        setBarbers(r.data.barbers ?? [])
+      })
       .catch(() => setError('Não foi possível carregar os serviços. Tente de novo.'))
   }, [])
 
@@ -60,17 +65,17 @@ export function GuestBook() {
   useEffect(() => {
     if (serviceIds.length === 0) return setSlots([])
     setLoadingSlots(true)
-    publicSlotsFn({ serviceIds, dateISO: day.toISOString() })
+    publicSlotsFn({ serviceIds, dateISO: day.toISOString(), barberId: barberId || 'any' })
       .then((r) => setSlots(r.data.slots))
       .catch(() => setError('Não foi possível carregar os horários.'))
       .finally(() => setLoadingSlots(false))
-  }, [serviceIds, day])
+  }, [serviceIds, day, barberId])
 
   async function book(timeISO: string) {
     setSaving(timeISO)
     setError('')
     try {
-      const r = await guestBookAppointmentFn({ name: name.trim(), phone, serviceIds, dateISO: timeISO })
+      const r = await guestBookAppointmentFn({ name: name.trim(), phone, serviceIds, dateISO: timeISO, barberId: barberId || 'any' })
       try {
         localStorage.setItem(SAVED_KEY, JSON.stringify({ name: name.trim(), phone }))
       } catch {
@@ -161,6 +166,24 @@ export function GuestBook() {
                 )}
               </section>
             )}
+
+{contactOk && picked.length > 0 && barbers.length > 1 && (
+        <div>
+          <p className="mb-2 text-xs font-medium text-neutral-400">Com qual barbeiro?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {[...barbers, { id: '', name: 'Sem preferência' }].map((b) => (
+              <button
+                key={b.id || 'any'}
+                type="button"
+                onClick={() => setBarberId(b.id)}
+                className={`rounded-full border px-3 py-1.5 text-sm ${barberId === b.id ? 'border-gold bg-gold/10 text-neutral-100' : 'border-ink-border bg-ink-card text-neutral-400'}`}
+              >
+                {b.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
             {contactOk && picked.length > 0 && (
               <section className="space-y-2">

@@ -1,13 +1,16 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
-import { RequireAuth } from './routes/RequireAuth'
+import { RequireAuth, homeFor } from './routes/RequireAuth'
 import { Spinner } from './components/ui/Spinner'
 
 import { Login } from './pages/auth/Login'
 import { Register } from './pages/auth/Register'
 import { GuestBook } from './pages/GuestBook'
 
-import { OwnerLayout } from './components/layout/OwnerLayout'
+import { BarberLayout, OwnerLayout } from './components/layout/OwnerLayout'
+import { Team } from './pages/owner/Team'
+import { BarberClients } from './pages/barber/BarberClients'
+import { BarberProduction } from './pages/barber/BarberProduction'
 import { Dashboard } from './pages/owner/Dashboard'
 import { Agenda } from './pages/owner/Agenda'
 import { Services } from './pages/owner/Services'
@@ -29,7 +32,7 @@ function Home() {
   if (loading) return <Spinner full />
   // Link único da barbearia: quem não está logado cai no cadastro (de lá pode entrar ou agendar sem conta).
   if (!profile) return <Navigate to="/register" replace />
-  return <Navigate to={profile.role === 'owner' ? '/owner' : '/app'} replace />
+  return <Navigate to={homeFor(profile.role)} replace />
 }
 
 export default function App() {
@@ -57,6 +60,20 @@ export default function App() {
         <Route path="subscriptions" element={<Subscriptions />} />
         <Route path="clients" element={<Clients />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="team" element={<Team />} />
+      </Route>
+
+      <Route
+        path="/barber"
+        element={
+          <RequireAuth role="barber">
+            <BarberLayout />
+          </RequireAuth>
+        }
+      >
+        <Route index element={<Agenda />} />
+        <Route path="clients" element={<BarberClients />} />
+        <Route path="production" element={<BarberProduction />} />
       </Route>
 
       <Route

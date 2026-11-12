@@ -40,6 +40,7 @@ function closureWrites(fs: Firestore, ymd: string, name: string, key: string | n
       date: spDate(y, m - 1, d, 0),
       durationMinutes: 24 * 60,
       reason: `Feriado: ${name}`,
+      barberId: null,
       createdAt: new Date(),
     }),
   ]

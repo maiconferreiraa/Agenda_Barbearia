@@ -11,7 +11,7 @@ import { usePlans } from '../hooks/usePlans'
 import { useAllSubscriptions } from '../hooks/useSubscriptions'
 import { formatCurrency } from '../lib/format'
 import { getAvailableSlotsFn, ownerBookAppointmentFn } from '../lib/bookingApi'
-import type { ServiceItem } from '../types'
+import type { Appointment, ServiceItem, UserProfile } from '../types'
 
 type PayMode = 'plan' | 'walk_in'
 
@@ -32,11 +32,41 @@ const chip = (on: boolean) =>
   `rounded-lg border p-3 text-left transition-colors ${on ? 'border-gold bg-gold/10' : 'border-ink-border bg-ink-card hover:border-gold-dark'}`
 
 /** Agenda → "+ Marcar horário": o dono marca pelo cliente, com crédito do plano ou avulso. */
-export function OwnerBookModal({ open, onClose, day }: { open: boolean; onClose: () => void; day: Date }) {
-  const { data: clients } = useClients()
+export function OwnerBookModal({
+  open,
+  onClose,
+  day,
+  barberMode = false,
+  defaultBarberId = '',
+  barbers = [],
+  myAppointments,
+}: {
+  open: boolean
+  onClose: () => void
+  day: Date
+  /** colaborador: marca na própria agenda; clientes = os da agenda dele */
+  barberMode?: boolean
+  defaultBarberId?: string
+  barbers?: { id: string; name: string }[]
+  myAppointments?: Appointment[]
+}) {
+  const { data: allClients } = useClients(!barberMode)
   const { data: services } = useServices({ onlyActive: true })
   const { data: plans } = usePlans()
-  const { data: subscriptions } = useAllSubscriptions()
+  const { data: subscriptions } = useAllSubscriptions(!barberMode)
+  // colaborador não lê a lista geral: usa os clientes que já passaram pela agenda dele
+  const clients: UserProfile[] = useMemo(() => {
+    if (!barberMode) return allClients
+    const seen = new Map<string, UserProfile>()
+    for (const a of myAppointments ?? []) {
+      const key = a.clientId || a.clientPhone || a.clientName
+      if (!seen.has(key)) {
+        seen.set(key, { uid: a.clientId || `guest:${a.clientPhone ?? a.clientName}`, name: a.clientName, phone: a.clientPhone ?? '', email: '', role: 'client' })
+      }
+    }
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'))
+  }, [barberMode, allClients, myAppointments])
+  const [barberId, setBarberId] = useState(defaultBarberId)
 
   const [search, setSearch] = useState('')
   const [clientId, setClientId] = useState<string | null>(null)
@@ -56,6 +86,7 @@ export function OwnerBookModal({ open, onClose, day }: { open: boolean; onClose:
   // Abre sempre limpo, no dia que está na agenda.
   useEffect(() => {
     if (!open) return
+    setBarberId(defaultBarberId)
     setSearch('')
     setClientId(null)
     setNewClient(false)
@@ -96,11 +127,11 @@ export function OwnerBookModal({ open, onClose, day }: { open: boolean; onClose:
       return
     }
     setLoadingSlots(true)
-    getAvailableSlotsFn({ serviceIds, dateISO: selectedDay.toISOString() })
+    getAvailableSlotsFn({ serviceIds, dateISO: selectedDay.toISOString(), ...(barberMode ? {} : { barberId: barberId || 'any' }) })
       .then((r) => setSlots(r.data.slots))
       .catch(() => setError('Não foi possível carregar os horários.'))
       .finally(() => setLoadingSlots(false))
-  }, [open, serviceIds, selectedDay])
+  }, [open, serviceIds, selectedDay, barberId, barberMode])
 
   const filtered = clients
     .filter((c) => {
@@ -118,11 +149,17 @@ export function OwnerBookModal({ open, onClose, day }: { open: boolean; onClose:
     setSaving(timeISO)
     setError('')
     try {
+      const guestFromList = client && client.uid.startsWith('guest:')
       const res = await ownerBookAppointmentFn({
-        ...(client ? { clientId: client.uid } : { clientName: guestName.trim(), clientPhone: guestPhone.trim() }),
+        ...(client && !guestFromList
+          ? { clientId: client.uid }
+          : client
+            ? { clientName: client.name, clientPhone: client.phone || undefined }
+            : { clientName: guestName.trim(), clientPhone: guestPhone.trim() }),
         serviceIds,
         dateISO: timeISO,
-        payMode,
+        payMode: barberMode ? 'auto' : payMode,
+        ...(barberMode ? {} : { barberId: barberId || 'any' }),
       })
       const t = new Date(timeISO).toLocaleString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
       setDone(`${who} — ${picked.map((s) => s.name).join(' + ')}, ${t}${res.data.usedPlanCredit ? ' (crédito do plano)' : ''}.`)
@@ -238,8 +275,31 @@ export function OwnerBookModal({ open, onClose, day }: { open: boolean; onClose:
           </section>
         )}
 
+        {/* Barbeiro (dono, quando há mais de um) */}
+        {ready && !barberMode && barbers.length > 1 && (
+          <section className="space-y-2">
+            <p className="text-xs font-medium text-neutral-400">Com qual barbeiro</p>
+            <div className="flex flex-wrap gap-1.5">
+              {[...barbers, { id: '', name: 'Sem preferência' }].map((b) => (
+                <button
+                  key={b.id || 'any'}
+                  type="button"
+                  onClick={() => setBarberId(b.id)}
+                  className={`rounded-full border px-3 py-1 text-sm ${barberId === b.id ? 'border-gold bg-gold/10 text-neutral-100' : 'border-ink-border text-neutral-400'}`}
+                >
+                  {b.name}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {ready && barberMode && (
+          <p className="text-xs text-neutral-500">Marca na sua agenda. Se o cliente tiver plano, o crédito é usado sozinho.</p>
+        )}
+
         {/* 3. Plano ou avulso */}
-        {ready && (
+        {ready && !barberMode && (
           <section className="space-y-2">
             <p className="text-xs font-medium text-neutral-400">3. Como vai ser pago</p>
             <div className="grid grid-cols-2 gap-2">

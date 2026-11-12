@@ -6,7 +6,7 @@ import { useServices } from '../../hooks/useServices'
 import { useAuth } from '../../contexts/AuthContext'
 import { useClientSubscriptions } from '../../hooks/useSubscriptions'
 import { formatCurrency } from '../../lib/format'
-import { getAvailableSlotsFn, bookAppointmentFn } from '../../lib/bookingApi'
+import { getAvailableSlotsFn, bookAppointmentFn, publicServicesFn } from '../../lib/bookingApi'
 import type { ServiceItem } from '../../types'
 
 function nextDays(n: number) {
@@ -35,6 +35,11 @@ export function Book() {
     usedPlanCredit: boolean
   } | null>(null)
   const [error, setError] = useState('')
+  const [barbers, setBarbers] = useState<{ id: string; name: string }[]>([])
+  const [barberId, setBarberId] = useState('')
+  useEffect(() => {
+    publicServicesFn({}).then((r) => setBarbers(r.data.barbers ?? [])).catch(() => setBarbers([]))
+  }, [])
 
   const activeSub = subscriptions.find((s) => s.status === 'active')
   const serviceIds = useMemo(() => selectedServices.map((s) => s.id), [selectedServices])
@@ -63,18 +68,18 @@ export function Book() {
     }
     setLoadingSlots(true)
     setError('')
-    getAvailableSlotsFn({ serviceIds, dateISO: selectedDay.toISOString() })
+    getAvailableSlotsFn({ serviceIds, dateISO: selectedDay.toISOString(), barberId: barberId || 'any' })
       .then((res) => setSlots(res.data.slots))
       .catch(() => setError('Não foi possível carregar os horários. Tente novamente.'))
       .finally(() => setLoadingSlots(false))
-  }, [selectedServices, selectedDay])
+  }, [selectedServices, selectedDay, barberId])
 
   async function handleBook(timeISO: string) {
     if (selectedServices.length === 0) return
     setBooking(timeISO)
     setError('')
     try {
-      const res = await bookAppointmentFn({ serviceIds, dateISO: timeISO })
+      const res = await bookAppointmentFn({ serviceIds, dateISO: timeISO, barberId: barberId || 'any' })
       setConfirmed({
         time: timeISO,
         serviceNames: selectedServices.map((s) => s.name).join(' + '),
@@ -166,6 +171,24 @@ export function Book() {
           </p>
         )}
       </div>
+
+{selectedServices.length > 0 && barbers.length > 1 && (
+        <div>
+          <p className="mb-2 text-xs font-medium text-neutral-400">Com qual barbeiro?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {[...barbers, { id: '', name: 'Sem preferência' }].map((b) => (
+              <button
+                key={b.id || 'any'}
+                type="button"
+                onClick={() => setBarberId(b.id)}
+                className={`rounded-full border px-3 py-1.5 text-sm ${barberId === b.id ? 'border-gold bg-gold/10 text-neutral-100' : 'border-ink-border bg-ink-card text-neutral-400'}`}
+              >
+                {b.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {selectedServices.length > 0 && (
         <div>

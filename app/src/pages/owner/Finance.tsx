@@ -12,6 +12,9 @@ import { buildReport, periodFor, type PeriodKind, type Row } from '../../lib/fin
 import { formatCurrency } from '../../lib/format'
 import { exportCsv, exportPdf } from '../../lib/financeExport'
 import { useFeeSettings } from '../../hooks/useFeeSettings'
+import { useBarbers } from '../../hooks/useTeam'
+import { productionByBarber } from '../../lib/production'
+import { ProductionTable } from '../../components/ProductionTable'
 import { useBusinessSettings } from '../../hooks/useBusinessSettings'
 import { Button } from '../../components/ui/Button'
 
@@ -62,6 +65,9 @@ export function Finance() {
   const { data: canceled } = useCanceledRange(period.start, period.end)
   const { settings } = useBusinessSettings()
   const { fees } = useFeeSettings()
+  const { data: barbers } = useBarbers()
+  const production = productionByBarber(appointments, barbers, period.start, period.end, barbers[0]?.uid)
+  const commissionTotal = production.reduce((s, r) => s + r.commission, 0)
   const report = useMemo(
     () =>
       buildReport(period, payments, appointments, expenses, canceled, {
@@ -236,6 +242,21 @@ export function Finance() {
               <h2 className="mb-2 font-display text-base text-neutral-100">Avulsos por serviço</h2>
               <RowsTable rows={report.byService} valueLabel="Qtd." empty="Nenhum avulso concluído neste período." />
             </Card>
+            {barbers.length > 0 && (
+              <Card className="md:col-span-2">
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <h2 className="font-display text-base text-neutral-100">Equipe — produção e comissão</h2>
+                  {commissionTotal > 0 && (
+                    <p className="text-xs text-neutral-500">Comissões a pagar no período: <b>{formatCurrency(commissionTotal)}</b></p>
+                  )}
+                </div>
+                <ProductionTable rows={production} />
+                <p className="mt-2 text-xs text-neutral-500">
+                  Produção = avulsos + serviços feitos pelo plano (pelo preço de tabela). Comissão = % de cada um sobre a produção.
+                  Lance o pagamento das comissões em Saídas.
+                </p>
+              </Card>
+            )}
             <div className="md:col-span-2">
               <ExpensesCard report={report} period={period} expenses={expenses} />
             </div>

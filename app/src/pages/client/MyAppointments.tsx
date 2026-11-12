@@ -69,7 +69,10 @@ export function MyAppointments() {
             <Card key={a.id} className="space-y-2">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-neutral-100">{a.serviceName}</p>
+                  <p className="text-sm font-medium text-neutral-100">
+                    {a.serviceName}
+                    {a.barberName && <span className="ml-1 text-xs font-normal text-neutral-500">com {a.barberName}</span>}
+                  </p>
                   <p className="text-xs text-neutral-500">{formatDateTime(a.date)}</p>
                   <p className="text-xs text-neutral-600">{appointmentPaymentLabel(a)}</p>
                 </div>

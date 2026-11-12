@@ -32,6 +32,7 @@ import { runHolidayNotices } from './holidays'
 import { runAutoComplete } from './autoComplete'
 import { runMarketing } from './marketing'
 import { confirmLinkCode, requestLinkCode } from './api/linkAccount'
+import { createCollaborator, setCollaboratorPassword, updateTeamMember } from './api/team'
 
 /** Endpoints chamados pelo app: POST /api/<nome>, com o token de login. */
 const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
@@ -55,6 +56,9 @@ const ROUTES: Record<string, (ctx: Ctx) => Promise<unknown>> = {
   // em espera (LINK_ACCOUNT_ENABLED = false responde "não encontrada")
   requestLinkCode,
   confirmLinkCode,
+  createCollaborator,
+  updateTeamMember,
+  setCollaboratorPassword,
 }
 
 const PUBLIC_ROUTES: Record<string, (env: Env, fs: Firestore, data: Record<string, unknown>) => Promise<unknown>> = {

@@ -158,6 +158,7 @@ export function Holidays() {
           date: Timestamp.fromDate(start),
           durationMinutes: minutes,
           reason: r.key ? `Feriado: ${r.name}` : r.name,
+          barberId: null,
           createdAt: Timestamp.now(),
         })
         blockIds.push(id)
