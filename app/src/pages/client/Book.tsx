@@ -8,21 +8,14 @@ import { useClientSubscriptions } from '../../hooks/useSubscriptions'
 import { formatCurrency } from '../../lib/format'
 import { getAvailableSlotsFn, bookAppointmentFn, publicServicesFn } from '../../lib/bookingApi'
 import type { ServiceItem } from '../../types'
+import { DayStrip, nextDays } from '../../components/DayStrip'
 
-function nextDays(n: number) {
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    d.setDate(d.getDate() + i)
-    return d
-  })
-}
 
 export function Book() {
   const { profile } = useAuth()
   const { data: services, loading: loadingServices } = useServices({ onlyActive: true })
   const { data: subscriptions } = useClientSubscriptions(profile?.uid)
-  const days = useMemo(() => nextDays(14), [])
+  const days = useMemo(() => nextDays(), [])
 
   const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([])
   const [selectedDay, setSelectedDay] = useState<Date>(days[0])
@@ -193,25 +186,7 @@ export function Book() {
       {selectedServices.length > 0 && (
         <div>
           <p className="mb-2 text-xs font-medium text-neutral-400">2. Escolha o dia</p>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {days.map((d) => {
-              const active = d.toDateString() === selectedDay.toDateString()
-              return (
-                <button
-                  key={d.toISOString()}
-                  onClick={() => setSelectedDay(d)}
-                  className={`flex shrink-0 flex-col items-center rounded-lg border px-3 py-2 ${
-                    active ? 'border-gold bg-gold/10' : 'border-ink-border bg-ink-card'
-                  }`}
-                >
-                  <span className="text-[10px] uppercase text-neutral-500">
-                    {d.toLocaleDateString('pt-BR', { weekday: 'short' })}
-                  </span>
-                  <span className="text-sm font-medium text-neutral-100">{d.getDate()}</span>
-                </button>
-              )
-            })}
-          </div>
+          <DayStrip days={days} selected={selectedDay} onSelect={setSelectedDay} />
         </div>
       )}
 

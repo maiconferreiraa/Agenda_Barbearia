@@ -10,17 +10,10 @@ import { Spinner } from '../components/ui/Spinner'
 import { formatCurrency } from '../lib/format'
 import { isValidPhone } from '../lib/phone'
 import { guestBookAppointmentFn, publicServicesFn, publicSlotsFn, type PublicService } from '../lib/bookingApi'
+import { DayStrip, nextDays } from '../components/DayStrip'
 
 const SAVED_KEY = 'agendar-sem-cadastro'
 
-function nextDays(n: number) {
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    d.setDate(d.getDate() + i)
-    return d
-  })
-}
 
 function loadSaved(): { name: string; phone: string } {
   try {
@@ -38,7 +31,7 @@ export function GuestBook() {
   const [phone, setPhone] = useState(saved.phone)
   const [services, setServices] = useState<PublicService[] | null>(null)
   const [picked, setPicked] = useState<PublicService[]>([])
-  const days = useMemo(() => nextDays(14), [])
+  const days = useMemo(() => nextDays(), [])
   const [day, setDay] = useState(days[0])
   const [slots, setSlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -188,24 +181,7 @@ export function GuestBook() {
             {contactOk && picked.length > 0 && (
               <section className="space-y-2">
                 <p className="text-xs font-medium text-neutral-400">3. Dia e horário</p>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {days.map((d) => {
-                    const on = d.toDateString() === day.toDateString()
-                    return (
-                      <button
-                        key={d.toISOString()}
-                        type="button"
-                        onClick={() => setDay(d)}
-                        className={`flex shrink-0 flex-col items-center rounded-lg border px-3 py-2 ${on ? 'border-gold bg-gold/10' : 'border-ink-border bg-ink-card'}`}
-                      >
-                        <span className="text-[10px] uppercase text-neutral-500">
-                          {d.toLocaleDateString('pt-BR', { weekday: 'short' })}
-                        </span>
-                        <span className="text-sm font-medium text-neutral-100">{d.getDate()}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+                <DayStrip days={days} selected={day} onSelect={setDay} />
                 {loadingSlots && <Spinner />}
                 {!loadingSlots && slots.length === 0 && <p className="text-sm text-neutral-500">Sem horários livres neste dia.</p>}
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">

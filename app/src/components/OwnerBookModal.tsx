@@ -12,21 +12,10 @@ import { useAllSubscriptions } from '../hooks/useSubscriptions'
 import { formatCurrency } from '../lib/format'
 import { getAvailableSlotsFn, ownerBookAppointmentFn } from '../lib/bookingApi'
 import type { Appointment, ServiceItem, UserProfile } from '../types'
+import { DayStrip, nextDays } from './DayStrip'
 
 type PayMode = 'plan' | 'walk_in'
 
-function nextDays(from: Date, n: number) {
-  const base = new Date(from)
-  base.setHours(0, 0, 0, 0)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const start = base < today ? today : base
-  return Array.from({ length: n }, (_, i) => {
-    const d = new Date(start)
-    d.setDate(d.getDate() + i)
-    return d
-  })
-}
 
 const chip = (on: boolean) =>
   `rounded-lg border p-3 text-left transition-colors ${on ? 'border-gold bg-gold/10' : 'border-ink-border bg-ink-card hover:border-gold-dark'}`
@@ -75,7 +64,7 @@ export function OwnerBookModal({
   const [guestPhone, setGuestPhone] = useState('')
   const [picked, setPicked] = useState<ServiceItem[]>([])
   const [payMode, setPayMode] = useState<PayMode>('walk_in')
-  const days = useMemo(() => nextDays(day, 14), [day])
+  const days = useMemo(() => nextDays(undefined, day), [day])
   const [selectedDay, setSelectedDay] = useState<Date>(days[0])
   const [slots, setSlots] = useState<string[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -327,24 +316,7 @@ export function OwnerBookModal({
         {ready && (
           <section className="space-y-2">
             <p className="text-xs font-medium text-neutral-400">4. Dia e horário</p>
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {days.map((d) => {
-                const on = d.toDateString() === selectedDay.toDateString()
-                return (
-                  <button
-                    key={d.toISOString()}
-                    type="button"
-                    onClick={() => setSelectedDay(d)}
-                    className={`flex shrink-0 flex-col items-center rounded-lg border px-3 py-2 ${on ? 'border-gold bg-gold/10' : 'border-ink-border bg-ink-card'}`}
-                  >
-                    <span className="text-[10px] uppercase text-neutral-500">
-                      {d.toLocaleDateString('pt-BR', { weekday: 'short' })}
-                    </span>
-                    <span className="text-sm font-medium text-neutral-100">{d.getDate()}</span>
-                  </button>
-                )
-              })}
-            </div>
+            <DayStrip days={days} selected={selectedDay} onSelect={setSelectedDay} />
             {loadingSlots && <Spinner />}
             {!loadingSlots && slots.length === 0 && <p className="text-sm text-neutral-500">Sem horários livres neste dia.</p>}
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
